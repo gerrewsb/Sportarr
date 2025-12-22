@@ -96,6 +96,7 @@ public class DelugeClient
 
             if (!await LoginAsync(config))
             {
+                _logger.LogError("[Deluge] Login failed, cannot add torrent");
                 return null;
             }
 
@@ -108,18 +109,42 @@ public class DelugeClient
 
             var response = await SendRpcRequestAsync(config, "core.add_torrent_url", new object[] { torrentUrl, options });
 
-            if (response != null)
+            if (response == null)
             {
-                var doc = JsonDocument.Parse(response);
-                if (doc.RootElement.TryGetProperty("result", out var result) && result.ValueKind == JsonValueKind.String)
-                {
-                    var hash = result.GetString();
-                    _logger.LogInformation("[Deluge] Torrent added: {Hash}", hash);
-                    return hash;
-                }
+                _logger.LogError("[Deluge] Add torrent request returned null response");
+                return null;
             }
 
-            return null;
+            var doc = JsonDocument.Parse(response);
+            if (!doc.RootElement.TryGetProperty("result", out var result))
+            {
+                _logger.LogError("[Deluge] Response missing 'result' property: {Response}", response);
+                return null;
+            }
+
+            // Handle different result types
+            if (result.ValueKind == JsonValueKind.String)
+            {
+                var hash = result.GetString();
+                _logger.LogInformation("[Deluge] Torrent added: {Hash}", hash);
+                return hash;
+            }
+            else if (result.ValueKind == JsonValueKind.Null)
+            {
+                _logger.LogError("[Deluge] Add torrent returned null - torrent may already exist or invalid URL");
+                return null;
+            }
+            else if (result.ValueKind == JsonValueKind.False)
+            {
+                _logger.LogError("[Deluge] Add torrent returned false - operation failed");
+                return null;
+            }
+            else
+            {
+                _logger.LogError("[Deluge] Unexpected result type: {Type}, Value: {Value}",
+                    result.ValueKind, result.ToString());
+                return null;
+            }
         }
         catch (Exception ex)
         {
