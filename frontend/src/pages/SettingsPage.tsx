@@ -1,4 +1,5 @@
 import { NavLink, Routes, Route, Navigate } from 'react-router-dom';
+import { useState } from 'react';
 import {
   Cog6ToothIcon,
   FolderIcon,
@@ -14,6 +15,8 @@ import {
   PaintBrushIcon,
   TagIcon,
   CloudArrowDownIcon,
+  Bars3Icon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 
 // Setting pages (to be created)
@@ -120,12 +123,49 @@ const settingsNavigation: SettingsNavItem[] = [
 ];
 
 export default function SettingsPage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Sidebar Navigation */}
-      <div className="w-64 bg-gradient-to-br from-gray-900 to-black border-r border-red-900/30 overflow-y-auto flex-shrink-0">
-        <div className="p-6">
-          <div className="flex items-center mb-6">
+    <div className="flex h-full overflow-hidden">
+      {/* Mobile Settings Header */}
+      <div className="fixed top-14 left-0 right-0 z-30 md:hidden bg-gradient-to-r from-gray-900 to-black border-b border-red-900/30">
+        <div className="flex items-center justify-between p-3">
+          <div className="flex items-center">
+            <Cog6ToothIcon className="w-6 h-6 text-red-600 mr-2" />
+            <h1 className="text-lg font-bold text-white">Settings</h1>
+          </div>
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 text-gray-300 hover:text-white hover:bg-red-900/30 rounded-lg transition-colors"
+          >
+            {mobileMenuOpen ? (
+              <XMarkIcon className="w-6 h-6" />
+            ) : (
+              <Bars3Icon className="w-6 h-6" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/80 z-20 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Navigation - Hidden on mobile unless menu is open */}
+      <div className={`
+        fixed md:relative inset-y-0 left-0 z-20
+        w-64 bg-gradient-to-br from-gray-900 to-black border-r border-red-900/30 overflow-y-auto flex-shrink-0
+        transform transition-transform duration-300 ease-in-out
+        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:translate-x-0
+        pt-28 md:pt-0
+      `}>
+        <div className="p-4 md:p-6">
+          <div className="hidden md:flex items-center mb-6">
             <Cog6ToothIcon className="w-8 h-8 text-red-600 mr-3" />
             <h1 className="text-2xl font-bold text-white">Settings</h1>
           </div>
@@ -136,8 +176,9 @@ export default function SettingsPage() {
               <NavLink
                 key={item.path}
                 to={item.path}
+                onClick={() => setMobileMenuOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center px-4 py-3 rounded-lg transition-all group ${
+                  `flex items-center px-3 md:px-4 py-2.5 md:py-3 rounded-lg transition-all group ${
                     isActive
                       ? 'bg-red-600 text-white'
                       : 'text-gray-400 hover:bg-gray-800 hover:text-white'
@@ -155,8 +196,8 @@ export default function SettingsPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-8">
+      <div className="flex-1 overflow-y-auto pt-14 md:pt-0">
+        <div className="p-4 md:p-8">
           <Routes>
             <Route path="/" element={<Navigate to="/settings/mediamanagement" replace />} />
             <Route path="/mediamanagement" element={<MediaManagementSettings />} />

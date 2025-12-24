@@ -867,19 +867,19 @@ export default function ActivityPage() {
   const showChangeCategory = anyCompleted && !anyHasPostImportCategory;
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="max-w-full mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Activity</h1>
-            <p className="text-gray-400">Monitor downloads and import history</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-1 md:mb-2">Activity</h1>
+            <p className="text-sm md:text-base text-gray-400">Monitor downloads and import history</p>
           </div>
           <div className="flex gap-2">
             {activeTab === 'queue' && (
               <button
                 onClick={() => setShowTableOptions(true)}
-                className="flex items-center px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                className="flex items-center px-3 md:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
                 title="Table Options"
               >
                 <Cog6ToothIcon className="w-5 h-5" />
@@ -887,66 +887,68 @@ export default function ActivityPage() {
             )}
             <button
               onClick={handleRefresh}
-              className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              className="flex items-center px-3 md:px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
             >
-              <ArrowPathIcon className="w-5 h-5 mr-2" />
-              Refresh
+              <ArrowPathIcon className="w-5 h-5 md:mr-2" />
+              <span className="hidden md:inline">Refresh</span>
             </button>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex space-x-1 mb-6 bg-gray-900 p-1 rounded-lg inline-flex">
-          <button
-            onClick={() => { setActiveTab('queue'); setPage(1); }}
-            className={`px-6 py-2 rounded-md transition-all ${
-              activeTab === 'queue'
-                ? 'bg-red-600 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800'
-            }`}
-          >
-            Queue
-            {queueItems.length > 0 && (
-              <span className="ml-2 px-2 py-0.5 bg-red-700 text-white text-xs rounded-full">
-                {queueItems.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => { setActiveTab('history'); setPage(1); }}
-            className={`px-6 py-2 rounded-md transition-all ${
-              activeTab === 'history'
-                ? 'bg-red-600 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800'
-            }`}
-          >
-            History
-          </button>
-          <button
-            onClick={() => { setActiveTab('blocklist'); setPage(1); }}
-            className={`px-6 py-2 rounded-md transition-all ${
-              activeTab === 'blocklist'
-                ? 'bg-red-600 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800'
-            }`}
-          >
-            Blocklist
-            {blocklistItems.length > 0 && (
-              <span className="ml-2 px-2 py-0.5 bg-red-700 text-white text-xs rounded-full">
-                {blocklistItems.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => { setActiveTab('grabHistory'); setPage(1); }}
-            className={`px-6 py-2 rounded-md transition-all ${
-              activeTab === 'grabHistory'
-                ? 'bg-red-600 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800'
-            }`}
-          >
-            Grab History
-          </button>
+        {/* Tabs - Scrollable on mobile */}
+        <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 mb-6">
+          <div className="flex space-x-1 bg-gray-900 p-1 rounded-lg inline-flex min-w-max">
+            <button
+              onClick={() => { setActiveTab('queue'); setPage(1); }}
+              className={`px-3 md:px-6 py-2 rounded-md transition-all whitespace-nowrap text-sm md:text-base ${
+                activeTab === 'queue'
+                  ? 'bg-red-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              Queue
+              {queueItems.length > 0 && (
+                <span className="ml-1 md:ml-2 px-1.5 md:px-2 py-0.5 bg-red-700 text-white text-xs rounded-full">
+                  {queueItems.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => { setActiveTab('history'); setPage(1); }}
+              className={`px-3 md:px-6 py-2 rounded-md transition-all whitespace-nowrap text-sm md:text-base ${
+                activeTab === 'history'
+                  ? 'bg-red-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              History
+            </button>
+            <button
+              onClick={() => { setActiveTab('blocklist'); setPage(1); }}
+              className={`px-3 md:px-6 py-2 rounded-md transition-all whitespace-nowrap text-sm md:text-base ${
+                activeTab === 'blocklist'
+                  ? 'bg-red-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              Blocklist
+              {blocklistItems.length > 0 && (
+                <span className="ml-1 md:ml-2 px-1.5 md:px-2 py-0.5 bg-red-700 text-white text-xs rounded-full">
+                  {blocklistItems.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => { setActiveTab('grabHistory'); setPage(1); }}
+              className={`px-3 md:px-6 py-2 rounded-md transition-all whitespace-nowrap text-sm md:text-base ${
+                activeTab === 'grabHistory'
+                  ? 'bg-red-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              Grab History
+            </button>
+          </div>
         </div>
 
         {/* Content */}

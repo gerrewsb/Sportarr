@@ -8,6 +8,8 @@ import {
   ServerIcon,
   ChevronDownIcon,
   ExclamationCircleIcon,
+  Bars3Icon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { useState, useEffect } from 'react';
 import FooterStatusBar from './FooterStatusBar';
@@ -24,6 +26,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const { data: systemStatus } = useSystemStatus();
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['Leagues']);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Safety net: Clean up any lingering inert attributes on route change
   // This should rarely be needed now that modals use stable ref data
@@ -144,15 +147,57 @@ export default function Layout() {
     if (currentSection) {
       setExpandedMenus(currentSection.children ? [currentSection.label] : []);
     }
+
+    // Close mobile menu on navigation
+    setMobileMenuOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
   return (
     <div className="flex h-screen bg-black text-gray-100">
-      {/* Sidebar */}
-      <aside className="w-64 bg-gradient-to-b from-gray-900 to-black border-r border-red-900/30 flex flex-col">
-        {/* Logo */}
-        <div className="p-4 border-b border-red-900/30">
+      {/* Mobile Header - Only visible on small screens */}
+      <div className="fixed top-0 left-0 right-0 z-50 md:hidden bg-gradient-to-r from-gray-900 to-black border-b border-red-900/30">
+        <div className="flex items-center justify-between p-3">
+          <Link to="/leagues" onClick={() => { cleanupInertAttributes(); setMobileMenuOpen(false); }} className="flex items-center space-x-2">
+            <img
+              src="/logo-64.png"
+              alt="Sportarr Logo"
+              className="w-8 h-8 rounded-lg"
+            />
+            <h1 className="text-lg font-bold text-white">Sportarr</h1>
+          </Link>
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 text-gray-300 hover:text-white hover:bg-red-900/30 rounded-lg transition-colors"
+          >
+            {mobileMenuOpen ? (
+              <XMarkIcon className="w-6 h-6" />
+            ) : (
+              <Bars3Icon className="w-6 h-6" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/80 z-40 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - Hidden on mobile unless menu is open */}
+      <aside className={`
+        fixed md:relative inset-y-0 left-0 z-40
+        w-64 bg-gradient-to-b from-gray-900 to-black border-r border-red-900/30 flex flex-col
+        transform transition-transform duration-300 ease-in-out
+        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:translate-x-0 md:flex
+        pt-14 md:pt-0
+      `}>
+        {/* Logo - Hidden on mobile (shown in header instead) */}
+        <div className="hidden md:block p-4 border-b border-red-900/30">
           <Link to="/leagues" onClick={cleanupInertAttributes} className="flex items-center space-x-3">
             <img
               src="/logo-64.png"
@@ -257,7 +302,7 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto bg-gradient-to-br from-gray-950 via-black to-gray-950">
+      <main className="flex-1 overflow-auto bg-gradient-to-br from-gray-950 via-black to-gray-950 pt-14 md:pt-0">
         <Outlet />
       </main>
     </div>

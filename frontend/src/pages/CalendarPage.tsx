@@ -132,32 +132,32 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="mb-4 md:mb-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
             <div>
-              <h1 className="text-3xl font-bold text-white mb-2">Calendar</h1>
-              <p className="text-gray-400">
-                View your monitored sports events for the week
+              <h1 className="text-2xl md:text-3xl font-bold text-white mb-1 md:mb-2">Calendar</h1>
+              <p className="text-sm md:text-base text-gray-400">
+                View your monitored sports events
               </p>
             </div>
 
             {/* Week Navigation */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-center gap-2 md:gap-4">
               <button
                 onClick={() => setCurrentWeekOffset(currentWeekOffset - 1)}
                 className="p-2 hover:bg-red-900/20 rounded-lg transition-colors"
                 title="Previous week"
               >
-                <ChevronLeftIcon className="w-6 h-6 text-gray-400 hover:text-white" />
+                <ChevronLeftIcon className="w-5 md:w-6 h-5 md:h-6 text-gray-400 hover:text-white" />
               </button>
 
-              <div className="text-center min-w-[200px]">
-                <p className="text-lg font-semibold text-white">{formatWeekRange()}</p>
+              <div className="text-center min-w-[140px] md:min-w-[200px]">
+                <p className="text-sm md:text-lg font-semibold text-white">{formatWeekRange()}</p>
                 {currentWeekOffset === 0 && (
-                  <p className="text-sm text-red-400">Current Week</p>
+                  <p className="text-xs md:text-sm text-red-400">Current Week</p>
                 )}
               </div>
 
@@ -166,33 +166,33 @@ export default function CalendarPage() {
                 className="p-2 hover:bg-red-900/20 rounded-lg transition-colors"
                 title="Next week"
               >
-                <ChevronRightIcon className="w-6 h-6 text-gray-400 hover:text-white" />
+                <ChevronRightIcon className="w-5 md:w-6 h-5 md:h-6 text-gray-400 hover:text-white" />
               </button>
             </div>
           </div>
 
           {/* Filters */}
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2 md:gap-4">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 md:px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm md:text-base"
             >
-              <FunnelIcon className="w-5 h-5" />
+              <FunnelIcon className="w-4 md:w-5 h-4 md:h-5" />
               Filters
               {(filterSport !== 'all' || filterTvOnly) && (
-                <span className="px-2 py-0.5 bg-red-600 text-white text-xs rounded-full">
+                <span className="px-1.5 md:px-2 py-0.5 bg-red-600 text-white text-xs rounded-full">
                   {(filterSport !== 'all' ? 1 : 0) + (filterTvOnly ? 1 : 0)}
                 </span>
               )}
             </button>
 
             {showFilters && (
-              <div className="flex items-center gap-4 animate-fade-in">
+              <div className="flex flex-wrap items-center gap-2 md:gap-4 animate-fade-in w-full md:w-auto">
                 {/* Sport Filter */}
                 <select
                   value={filterSport}
                   onChange={(e) => setFilterSport(e.target.value)}
-                  className="px-3 py-2 bg-gray-800 border border-gray-700 text-white rounded-lg focus:outline-none focus:border-red-600"
+                  className="px-2 md:px-3 py-2 bg-gray-800 border border-gray-700 text-white rounded-lg focus:outline-none focus:border-red-600 text-sm md:text-base"
                 >
                   <option value="all">All Sports</option>
                   {uniqueSports.map(sport => (
@@ -201,15 +201,15 @@ export default function CalendarPage() {
                 </select>
 
                 {/* TV Only Filter */}
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer text-sm md:text-base">
                   <input
                     type="checkbox"
                     checked={filterTvOnly}
                     onChange={(e) => setFilterTvOnly(e.target.checked)}
                     className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-red-600 focus:ring-red-600"
                   />
-                  <TvIcon className="w-5 h-5 text-green-400" />
-                  <span className="text-white">TV Schedule Only</span>
+                  <TvIcon className="w-4 md:w-5 h-4 md:h-5 text-green-400" />
+                  <span className="text-white">TV Only</span>
                 </label>
 
                 {(filterSport !== 'all' || filterTvOnly) && (
@@ -218,9 +218,9 @@ export default function CalendarPage() {
                       setFilterSport('all');
                       setFilterTvOnly(false);
                     }}
-                    className="text-red-400 hover:text-red-300 text-sm"
+                    className="text-red-400 hover:text-red-300 text-xs md:text-sm"
                   >
-                    Clear Filters
+                    Clear
                   </button>
                 )}
               </div>
@@ -228,8 +228,8 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {/* Calendar Grid */}
-        <div className="grid grid-cols-7 gap-2">
+        {/* Calendar Grid - Stacked on mobile, 7 columns on desktop */}
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-2 md:gap-2">
           {weekDays.map((day, index) => {
             const dayEvents = getEventsForDay(day, events);
             const today = isToday(day);
@@ -237,22 +237,24 @@ export default function CalendarPage() {
             return (
               <div
                 key={day.toISOString()}
-                className={`bg-gradient-to-br from-gray-900 to-black border rounded-lg overflow-hidden min-h-[200px] ${
+                className={`bg-gradient-to-br from-gray-900 to-black border rounded-lg overflow-hidden min-h-[100px] md:min-h-[200px] ${
                   today ? 'border-red-600 shadow-lg shadow-red-900/30' : 'border-red-900/30'
                 }`}
               >
                 {/* Day Header */}
-                <div className={`px-3 py-2 border-b ${today ? 'bg-red-950/40 border-red-900/40' : 'bg-gray-800/30 border-red-900/20'}`}>
-                  <div className="text-xs text-gray-400 font-medium">
-                    {dayNames[index]}
-                  </div>
-                  <div className={`text-lg font-bold ${today ? 'text-red-400' : 'text-white'}`}>
-                    {day.getDate()}
+                <div className={`px-2 md:px-3 py-1.5 md:py-2 border-b ${today ? 'bg-red-950/40 border-red-900/40' : 'bg-gray-800/30 border-red-900/20'}`}>
+                  <div className="flex md:block items-center gap-2">
+                    <div className="text-xs text-gray-400 font-medium">
+                      {dayNames[index]}
+                    </div>
+                    <div className={`text-base md:text-lg font-bold ${today ? 'text-red-400' : 'text-white'}`}>
+                      {day.getDate()}
+                    </div>
                   </div>
                 </div>
 
                 {/* Events for the day */}
-                <div className="p-2 space-y-2">
+                <div className="p-1.5 md:p-2 space-y-1.5 md:space-y-2">
                   {dayEvents.length > 0 ? (
                     dayEvents.map(event => {
                       const sportColors = getSportColors(event.sport || 'default');
