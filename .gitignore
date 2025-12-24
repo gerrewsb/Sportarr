@@ -175,6 +175,7 @@ CLAUDE.md
 
 # Sportarr logs directory
 src/logs/
+src/Data/logs/
 
 # SQLite database files (runtime data, should not be committed)
 *.db
