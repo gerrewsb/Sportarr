@@ -64,35 +64,35 @@ export default function ConfirmationModal({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-lg bg-gradient-to-br from-gray-900 to-black border border-red-900/30 text-left align-middle shadow-xl transition-all">
-                <div className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-600/20 flex items-center justify-center">
-                      <ExclamationTriangleIcon className="w-6 h-6 text-red-400" />
+              <Dialog.Panel className="w-full max-w-md mx-4 transform overflow-hidden rounded-lg bg-gradient-to-br from-gray-900 to-black border border-red-900/30 text-left align-middle shadow-xl transition-all">
+                <div className="p-4 md:p-6">
+                  <div className="flex items-start gap-3 md:gap-4">
+                    <div className="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-full bg-red-600/20 flex items-center justify-center">
+                      <ExclamationTriangleIcon className="w-5 h-5 md:w-6 md:h-6 text-red-400" />
                     </div>
-                    <div className="flex-1">
-                      <Dialog.Title as="h3" className="text-lg font-bold text-white mb-2">
+                    <div className="flex-1 min-w-0">
+                      <Dialog.Title as="h3" className="text-base md:text-lg font-bold text-white mb-1 md:mb-2">
                         {title}
                       </Dialog.Title>
-                      <p className="text-sm text-gray-400">
+                      <p className="text-xs md:text-sm text-gray-400">
                         {message}
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="border-t border-red-900/30 p-4 bg-black/30 flex gap-3 justify-end">
+                <div className="border-t border-red-900/30 p-3 md:p-4 bg-black/30 flex gap-2 md:gap-3 justify-end">
                   <button
                     onClick={onClose}
                     disabled={isLoading}
-                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm md:text-base font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={onConfirm}
                     disabled={isLoading}
-                    className={`px-4 py-2 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${confirmButtonClass}`}
+                    className={`px-3 md:px-4 py-1.5 md:py-2 text-white rounded-lg text-sm md:text-base font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${confirmButtonClass}`}
                   >
                     {isLoading ? 'Processing...' : confirmText}
                   </button>

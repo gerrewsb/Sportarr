@@ -716,22 +716,22 @@ export default function LeagueDetailPage() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Back Button */}
         <button
           onClick={() => navigate('/leagues')}
-          className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors"
+          className="flex items-center gap-2 text-gray-400 hover:text-white mb-4 md:mb-6 transition-colors text-sm md:text-base"
         >
-          <ArrowLeftIcon className="w-5 h-5" />
+          <ArrowLeftIcon className="w-4 h-4 md:w-5 md:h-5" />
           Back to Leagues
         </button>
 
         {/* League Header */}
-        <div className="bg-gradient-to-br from-gray-900 to-black border border-red-900/30 rounded-lg overflow-hidden mb-8">
+        <div className="bg-gradient-to-br from-gray-900 to-black border border-red-900/30 rounded-lg overflow-hidden mb-4 md:mb-8">
           {/* Banner/Logo */}
           {(league.bannerUrl || league.logoUrl || league.posterUrl) && (
-            <div className="relative h-64 bg-gray-800">
+            <div className="relative h-40 md:h-64 bg-gray-800">
               <img
                 src={league.bannerUrl || league.logoUrl || league.posterUrl}
                 alt={league.name}
@@ -741,28 +741,28 @@ export default function LeagueDetailPage() {
             </div>
           )}
 
-          <div className="p-8">
-            <div className="flex items-start justify-between">
+          <div className="p-4 md:p-8">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
               <div>
-                <h1 className="text-4xl font-bold text-white mb-2">{league.name}</h1>
-                <div className="flex items-center gap-4 text-gray-400">
-                  <span className="px-3 py-1 bg-red-600/20 text-red-400 text-sm rounded font-medium">
+                <h1 className="text-2xl md:text-4xl font-bold text-white mb-2">{league.name}</h1>
+                <div className="flex flex-wrap items-center gap-2 md:gap-4 text-gray-400">
+                  <span className="px-2 md:px-3 py-1 bg-red-600/20 text-red-400 text-xs md:text-sm rounded font-medium">
                     {league.sport}
                   </span>
                   {league.country && (
-                    <span className="text-sm">{league.country}</span>
+                    <span className="text-xs md:text-sm">{league.country}</span>
                   )}
                   {league.formedYear && (
-                    <span className="text-sm">Est. {league.formedYear}</span>
+                    <span className="text-xs md:text-sm">Est. {league.formedYear}</span>
                   )}
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap md:flex-col gap-2 md:gap-3">
                 <button
                   onClick={() => toggleLeagueMonitorMutation.mutate(!league.monitored)}
                   disabled={toggleLeagueMonitorMutation.isPending}
-                  className={`px-4 py-2 text-white text-sm font-semibold rounded-lg transition-colors ${
+                  className={`px-3 md:px-4 py-1.5 md:py-2 text-white text-xs md:text-sm font-semibold rounded-lg transition-colors ${
                     league.monitored
                       ? 'bg-green-600 hover:bg-green-700'
                       : 'bg-gray-600 hover:bg-gray-700'
@@ -773,29 +773,29 @@ export default function LeagueDetailPage() {
                 </button>
                 <button
                   onClick={openEditModal}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+                  className="px-3 md:px-4 py-1.5 md:py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 md:gap-2"
                   title="Edit monitored teams and monitoring settings"
                 >
-                  <UsersIcon className="w-4 h-4" />
+                  <UsersIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
                   Edit
                 </button>
                 {league.fileCount > 0 && (
                   <button
                     onClick={() => setLeagueFilesModal({ isOpen: true })}
-                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+                    className="px-3 md:px-4 py-1.5 md:py-2 bg-gray-600 hover:bg-gray-700 text-white text-xs md:text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 md:gap-2"
                     title="View all downloaded files for this league"
                   >
-                    <FolderOpenIcon className="w-4 h-4" />
-                    All Files ({league.fileCount})
+                    <FolderOpenIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                    <span className="hidden sm:inline">All Files</span> ({league.fileCount})
                   </button>
                 )}
                 <button
                   onClick={openDeleteConfirm}
                   disabled={deleteLeagueMutation.isPending}
-                  className="px-4 py-2 bg-red-600/80 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 md:px-4 py-1.5 md:py-2 bg-red-600/80 hover:bg-red-700 text-white text-xs md:text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Remove league from library"
                 >
-                  {deleteLeagueMutation.isPending ? 'Deleting...' : 'Delete League'}
+                  {deleteLeagueMutation.isPending ? 'Deleting...' : 'Delete'}
                 </button>
               </div>
             </div>
@@ -820,39 +820,40 @@ export default function LeagueDetailPage() {
             )}
 
             {/* League-Level Search Actions (Sonarr-style show/season search) */}
-            <div className="mt-6 pt-6 border-t border-red-900/30">
-              <div className="flex items-center justify-between">
+            <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-red-900/30">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-semibold text-white mb-1">Search All Monitored Events</h3>
+                  <h3 className="text-xs md:text-sm font-semibold text-white mb-0.5 md:mb-1">Search All Monitored Events</h3>
                   <p className="text-xs text-gray-400">
-                    Search all monitored events for missing files and quality upgrades
+                    Search for missing files and quality upgrades
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={handleLeagueAutomaticSearch}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition-colors flex items-center gap-2"
+                    className="px-3 md:px-4 py-1.5 md:py-2 bg-red-600 hover:bg-red-700 text-white text-xs md:text-sm font-medium rounded transition-colors flex items-center gap-1.5 md:gap-2"
                     title="Search all monitored events - downloads missing files and upgrades existing files if better quality is available"
                   >
-                    <MagnifyingGlassIcon className="w-4 h-4" />
-                    Search League
+                    <MagnifyingGlassIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                    <span className="hidden sm:inline">Search League</span>
+                    <span className="sm:hidden">Search</span>
                   </button>
                   <button
                     onClick={handleRefreshEvents}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors flex items-center gap-2"
+                    className="px-3 md:px-4 py-1.5 md:py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-medium rounded transition-colors flex items-center gap-1.5 md:gap-2"
                     title="Refresh events from TheSportsDB API - fetches and adds new events to the league"
                   >
-                    <ArrowPathIcon className="w-4 h-4" />
-                    Refresh Events
+                    <ArrowPathIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                    Refresh
                   </button>
                 </div>
               </div>
             </div>
 
             {/* Monitoring Settings */}
-            <div className="mt-6 pt-6 border-t border-red-900/30">
-              <h3 className="text-sm font-semibold text-white mb-4">Monitoring Settings</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-red-900/30">
+              <h3 className="text-xs md:text-sm font-semibold text-white mb-3 md:mb-4">Monitoring Settings</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                 {/* Monitor Type */}
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-2">
@@ -939,26 +940,26 @@ export default function LeagueDetailPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-gray-900 border border-red-900/30 rounded-lg p-6">
-            <div className="text-gray-400 text-sm mb-1">Total Events</div>
-            <div className="text-3xl font-bold text-white">{league.eventCount}</div>
+        <div className="grid grid-cols-3 gap-2 md:gap-6 mb-4 md:mb-8">
+          <div className="bg-gray-900 border border-red-900/30 rounded-lg p-3 md:p-6">
+            <div className="text-gray-400 text-xs md:text-sm mb-1">Total Events</div>
+            <div className="text-xl md:text-3xl font-bold text-white">{league.eventCount}</div>
           </div>
-          <div className="bg-gray-900 border border-red-900/30 rounded-lg p-6">
-            <div className="text-gray-400 text-sm mb-1">Monitored Events</div>
-            <div className="text-3xl font-bold text-green-400">{league.monitoredEventCount}</div>
+          <div className="bg-gray-900 border border-red-900/30 rounded-lg p-3 md:p-6">
+            <div className="text-gray-400 text-xs md:text-sm mb-1">Monitored</div>
+            <div className="text-xl md:text-3xl font-bold text-green-400">{league.monitoredEventCount}</div>
           </div>
-          <div className="bg-gray-900 border border-red-900/30 rounded-lg p-6">
-            <div className="text-gray-400 text-sm mb-1">Downloaded Files</div>
-            <div className="text-3xl font-bold text-blue-400">{league.fileCount}</div>
+          <div className="bg-gray-900 border border-red-900/30 rounded-lg p-3 md:p-6">
+            <div className="text-gray-400 text-xs md:text-sm mb-1">Downloaded</div>
+            <div className="text-xl md:text-3xl font-bold text-blue-400">{league.fileCount}</div>
           </div>
         </div>
 
         {/* Events Section */}
         <div className="bg-gray-900 border border-red-900/30 rounded-lg overflow-hidden">
-          <div className="p-6 border-b border-red-900/30">
-            <h2 className="text-2xl font-bold text-white">Events</h2>
-            <p className="text-gray-400 text-sm mt-1">
+          <div className="p-4 md:p-6 border-b border-red-900/30">
+            <h2 className="text-xl md:text-2xl font-bold text-white">Events</h2>
+            <p className="text-gray-400 text-xs md:text-sm mt-1">
               {Array.isArray(events) ? events.length : 0} event{Array.isArray(events) && events.length !== 1 ? 's' : ''} in this league
             </p>
           </div>
@@ -986,8 +987,8 @@ export default function LeagueDetailPage() {
                 return (
                   <div key={season} className="border-b border-red-900/30 last:border-b-0">
                     {/* Season Header Row */}
-                    <div className="p-6 hover:bg-gray-800/30 transition-colors">
-                      <div className="flex items-center gap-4">
+                    <div className="p-4 md:p-6 hover:bg-gray-800/30 transition-colors">
+                      <div className="flex items-center gap-2 md:gap-4">
                         {/* Season Monitor Toggle */}
                         <button
                           onClick={(e) => {
@@ -1003,9 +1004,9 @@ export default function LeagueDetailPage() {
                           title={monitoredCount > 0 ? "Unmonitor all events in this season" : "Monitor all events in this season"}
                         >
                           {monitoredCount > 0 ? (
-                            <CheckCircleIcon className="w-6 h-6 text-green-500" />
+                            <CheckCircleIcon className="w-5 h-5 md:w-6 md:h-6 text-green-500" />
                           ) : (
-                            <XCircleIcon className="w-6 h-6 text-gray-600" />
+                            <XCircleIcon className="w-5 h-5 md:w-6 md:h-6 text-gray-600" />
                           )}
                         </button>
 
@@ -1015,15 +1016,15 @@ export default function LeagueDetailPage() {
                           className="flex items-center gap-2 flex-1 text-left"
                         >
                           {isExpanded ? (
-                            <ChevronDownIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronDownIcon className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
                           ) : (
-                            <ChevronRightIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronRightIcon className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
                           )}
                           <div>
-                            <h3 className="text-xl font-bold text-white">
+                            <h3 className="text-base md:text-xl font-bold text-white">
                               {season === 'Unknown' ? 'No Season Info' : `Season ${season}`}
                             </h3>
-                            <p className="text-sm text-gray-400 mt-1">
+                            <p className="text-xs md:text-sm text-gray-400 mt-0.5 md:mt-1">
                               {seasonEvents.length} event{seasonEvents.length !== 1 ? 's' : ''}
                               {monitoredCount > 0 && ` • ${monitoredCount} monitored`}
                               {hasFileCount > 0 && ` • ${hasFileCount} downloaded`}
@@ -1033,7 +1034,7 @@ export default function LeagueDetailPage() {
                       </div>
 
                       {/* Season Actions Row */}
-                      <div className="flex items-center gap-3 mt-4 ml-10">
+                      <div className="flex flex-wrap items-center gap-2 md:gap-3 mt-3 md:mt-4 ml-7 md:ml-10">
                         {/* Season Quality Profile */}
                         <select
                           value={league?.qualityProfileId || ''}
@@ -1041,7 +1042,7 @@ export default function LeagueDetailPage() {
                             qualityProfileId: e.target.value ? parseInt(e.target.value) : null
                           })}
                           disabled={updateLeagueSettingsMutation.isPending}
-                          className="px-3 py-1.5 bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded focus:outline-none focus:ring-2 focus:ring-red-500"
+                          className="px-2 md:px-3 py-1 md:py-1.5 bg-gray-800 border border-gray-700 text-gray-200 text-xs md:text-sm rounded focus:outline-none focus:ring-2 focus:ring-red-500"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <option value="">No Quality Profile</option>
@@ -1062,11 +1063,12 @@ export default function LeagueDetailPage() {
                             // Note: Manual search for season would require a new modal to show all events
                             // For now, users can search individual events
                           }}
-                          className="px-4 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded transition-colors flex items-center gap-2"
+                          className="px-2 md:px-4 py-1 md:py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs md:text-sm font-medium rounded transition-colors flex items-center gap-1 md:gap-2"
                           title="Manual Search - Browse and select releases for all events in this season"
                         >
-                          <UserIcon className="w-4 h-4" />
-                          Manual Search
+                          <UserIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                          <span className="hidden sm:inline">Manual Search</span>
+                          <span className="sm:hidden">Manual</span>
                         </button>
 
                         {/* Season Auto Search */}
@@ -1101,11 +1103,12 @@ export default function LeagueDetailPage() {
                               });
                             }
                           }}
-                          className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition-colors flex items-center gap-2"
+                          className="px-2 md:px-4 py-1 md:py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs md:text-sm font-medium rounded transition-colors flex items-center gap-1 md:gap-2"
                           title="Automatic Search - Search for all monitored events in this season"
                         >
-                          <MagnifyingGlassIcon className="w-4 h-4" />
-                          Auto Search
+                          <MagnifyingGlassIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                          <span className="hidden sm:inline">Auto Search</span>
+                          <span className="sm:hidden">Auto</span>
                         </button>
 
                         {/* Season Files Button */}
@@ -1115,11 +1118,11 @@ export default function LeagueDetailPage() {
                               e.stopPropagation();
                               setLeagueFilesModal({ isOpen: true, season });
                             }}
-                            className="px-4 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded transition-colors flex items-center gap-2"
+                            className="px-2 md:px-4 py-1 md:py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs md:text-sm font-medium rounded transition-colors flex items-center gap-1 md:gap-2"
                             title={`View all downloaded files for ${season}`}
                           >
-                            <FolderOpenIcon className="w-4 h-4" />
-                            Files ({hasFileCount})
+                            <FolderOpenIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                            <span className="hidden sm:inline">Files</span> ({hasFileCount})
                           </button>
                         )}
                       </div>
@@ -1136,9 +1139,9 @@ export default function LeagueDetailPage() {
                 return (
                   <div key={event.id} className="hover:bg-gray-800/50 transition-colors">
                     {/* Event Row */}
-                    <div className="p-6">
+                    <div className="p-3 md:p-6">
                       {/* Event Header */}
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 md:gap-4">
                         {/* Monitor Toggle */}
                         <button
                           onClick={() => toggleMonitorMutation.mutate({
@@ -1150,15 +1153,15 @@ export default function LeagueDetailPage() {
                           disabled={toggleMonitorMutation.isPending}
                         >
                           {event.monitored ? (
-                            <CheckCircleIcon className="w-6 h-6 text-green-500" />
+                            <CheckCircleIcon className="w-5 h-5 md:w-6 md:h-6 text-green-500" />
                           ) : (
-                            <XCircleIcon className="w-6 h-6 text-gray-600" />
+                            <XCircleIcon className="w-5 h-5 md:w-6 md:h-6 text-gray-600" />
                           )}
                         </button>
 
                         {/* Event Title */}
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-white">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm md:text-lg font-semibold text-white truncate">
                             {event.title}
                           </h3>
                         </div>
@@ -1195,8 +1198,8 @@ export default function LeagueDetailPage() {
                       </div>
 
                       {/* Event Details */}
-                      <div className="ml-10 mt-2 space-y-1">
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400">
+                      <div className="ml-7 md:ml-10 mt-2 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2 md:gap-3 text-xs md:text-sm text-gray-400">
                           <span>{eventDate.toLocaleDateString('en-US', {
                             year: 'numeric',
                             month: 'short',
@@ -1222,7 +1225,7 @@ export default function LeagueDetailPage() {
 
                         {/* Team Names */}
                         {event.homeTeamName && event.awayTeamName && (
-                          <div className="text-sm text-gray-300">
+                          <div className="text-xs md:text-sm text-gray-300">
                             {event.homeTeamName} vs {event.awayTeamName}
                             {event.homeScore !== undefined && event.awayScore !== undefined && (
                               <span className="ml-2 text-gray-400">
@@ -1233,7 +1236,7 @@ export default function LeagueDetailPage() {
                         )}
 
                         {event.venue && (
-                          <div className="text-sm text-gray-400">
+                          <div className="text-xs md:text-sm text-gray-400 hidden sm:block">
                             {event.venue}
                             {event.location && `, ${event.location}`}
                           </div>
@@ -1241,22 +1244,22 @@ export default function LeagueDetailPage() {
                       </div>
 
                       {/* Event Actions */}
-                      <div className="flex items-center gap-3 mt-4 ml-10">
+                      <div className="flex flex-wrap items-center gap-2 md:gap-3 mt-3 md:mt-4 ml-7 md:ml-10">
                             {/* Quality Profile Dropdown */}
-                            <div className="flex-1 max-w-xs">
+                            <div className="flex-1 max-w-[150px] md:max-w-xs">
                               <select
                                 value={event.qualityProfileId || league?.qualityProfileId || ''}
                                 onChange={(e) => updateQualityMutation.mutate({
                                   eventId: event.id,
                                   qualityProfileId: e.target.value ? Number(e.target.value) : null
                                 })}
-                                className="w-full px-3 py-1.5 bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded focus:outline-none focus:ring-2 focus:ring-red-500"
+                                className="w-full px-2 md:px-3 py-1 md:py-1.5 bg-gray-800 border border-gray-700 text-gray-200 text-xs md:text-sm rounded focus:outline-none focus:ring-2 focus:ring-red-500"
                                 disabled={updateQualityMutation.isPending}
                               >
                                 <option value="">
                                   {league?.qualityProfileId
-                                    ? `Use League Default (${Array.isArray(qualityProfiles) ? qualityProfiles.find(p => p.id === league.qualityProfileId)?.name || 'Unknown' : 'Unknown'})`
-                                    : 'No Quality Profile'}
+                                    ? `League (${Array.isArray(qualityProfiles) ? qualityProfiles.find(p => p.id === league.qualityProfileId)?.name || '?' : '?'})`
+                                    : 'No Profile'}
                                 </option>
                                 {Array.isArray(qualityProfiles) && qualityProfiles.map(profile => (
                                   <option key={profile.id} value={profile.id}>
@@ -1273,20 +1276,20 @@ export default function LeagueDetailPage() {
                               <>
                                 <button
                                   onClick={() => handleManualSearch(event.id, event.title)}
-                                  className="px-4 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded transition-colors flex items-center gap-2"
+                                  className="px-2 md:px-4 py-1 md:py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs md:text-sm font-medium rounded transition-colors flex items-center gap-1 md:gap-2"
                                   title="Manual Search - Browse and select from available releases"
                                 >
-                                  <UserIcon className="w-4 h-4" />
-                                  Manual Search
+                                  <UserIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                                  <span className="hidden sm:inline">Manual</span>
                                 </button>
 
                                 <button
                                   onClick={() => handleAutomaticSearch(event.id, event.title, event.qualityProfileId || league?.qualityProfileId)}
-                                  className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition-colors flex items-center gap-2"
+                                  className="px-2 md:px-4 py-1 md:py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs md:text-sm font-medium rounded transition-colors flex items-center gap-1 md:gap-2"
                                   title="Search for monitored event"
                                 >
-                                  <MagnifyingGlassIcon className="w-4 h-4" />
-                                  Auto Search
+                                  <MagnifyingGlassIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                                  <span className="hidden sm:inline">Auto</span>
                                 </button>
                               </>
                             )}
@@ -1294,7 +1297,7 @@ export default function LeagueDetailPage() {
 
                           {/* Fight Card Parts (for fighting sports with multi-part episodes enabled) */}
                           {config?.enableMultiPartEpisodes && isFightingSport(event.sport) && (
-                            <div className="mt-4 ml-10 space-y-3">
+                            <div className="mt-3 md:mt-4 ml-7 md:ml-10 space-y-2 md:space-y-3">
                               {getEventParts(event).map((part) => {
                                 // monitoredParts values:
                                 // - null/undefined = ALL parts monitored (default)
@@ -1325,7 +1328,7 @@ export default function LeagueDetailPage() {
                                 const partFile = partStatus?.file ?? event.files?.find(f => f.partName === part.name && f.exists);
 
                                 return (
-                                  <div key={part.name} className="flex items-center gap-3">
+                                  <div key={part.name} className="flex flex-wrap items-center gap-2 md:gap-3">
                                     {/* Part Monitor Toggle */}
                                     <button
                                       onClick={() => {
@@ -1361,25 +1364,25 @@ export default function LeagueDetailPage() {
                                       title={`${isPartMonitored ? 'Unmonitor' : 'Monitor'} ${part.label}`}
                                     >
                                       {isPartMonitored ? (
-                                        <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                                        <CheckCircleIcon className="w-4 h-4 md:w-5 md:h-5 text-green-500" />
                                       ) : (
-                                        <XCircleIcon className="w-5 h-5 text-gray-600" />
+                                        <XCircleIcon className="w-4 h-4 md:w-5 md:h-5 text-gray-600" />
                                       )}
                                     </button>
 
                                     {/* Part Name and File/Status Display */}
-                                    <div className="flex-1 flex items-center gap-2">
-                                      <span className={`text-sm font-medium ${isPartMonitored ? 'text-white' : 'text-gray-500'}`}>
+                                    <div className="flex-1 flex flex-wrap items-center gap-1 md:gap-2 min-w-0">
+                                      <span className={`text-xs md:text-sm font-medium ${isPartMonitored ? 'text-white' : 'text-gray-500'}`}>
                                         {part.label}
                                       </span>
                                       {/* Show file info if downloaded, otherwise show status badge for search/download progress */}
                                       {partFile ? (
-                                        <span className="text-xs text-gray-400 flex items-center gap-1.5">
-                                          <FilmIcon className="w-3.5 h-3.5 text-green-500" />
-                                          {partFile.quality && <span className="text-blue-400">{partFile.quality}</span>}
-                                          <span>({formatFileSize(partFile.size)})</span>
+                                        <span className="text-xs text-gray-400 flex items-center gap-1 md:gap-1.5">
+                                          <FilmIcon className="w-3 h-3 md:w-3.5 md:h-3.5 text-green-500" />
+                                          {partFile.quality && <span className="text-blue-400 hidden sm:inline">{partFile.quality}</span>}
+                                          <span className="hidden sm:inline">({formatFileSize(partFile.size)})</span>
                                           {partFile.customFormatScore !== undefined && partFile.customFormatScore !== 0 && (
-                                            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                                            <span className={`px-1 md:px-1.5 py-0.5 rounded text-xs font-medium hidden md:inline ${
                                               partFile.customFormatScore > 0
                                                 ? 'bg-green-900/40 text-green-400'
                                                 : 'bg-red-900/40 text-red-400'
@@ -1409,32 +1412,32 @@ export default function LeagueDetailPage() {
                                             });
                                           }
                                         }}
-                                        className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-600/10 rounded transition-colors"
+                                        className="p-1 md:p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-600/10 rounded transition-colors"
                                         disabled={deleteEventFileMutation.isPending}
                                         title={`Delete ${part.label} file`}
                                       >
-                                        <TrashIcon className="w-4 h-4" />
+                                        <TrashIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
                                       </button>
                                     )}
 
                                     {/* Part Manual Search */}
                                     <button
                                       onClick={() => handleManualSearch(event.id, event.title, part.name, event.files)}
-                                      className="px-4 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded transition-colors flex items-center gap-2"
+                                      className="px-2 md:px-4 py-1 md:py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs md:text-sm font-medium rounded transition-colors flex items-center gap-1 md:gap-2"
                                       title={`Manual Search - Browse and select ${part.label} releases`}
                                     >
-                                      <UserIcon className="w-4 h-4" />
-                                      Manual Search
+                                      <UserIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                                      <span className="hidden sm:inline">Manual</span>
                                     </button>
 
                                     {/* Part Auto Search */}
                                     <button
                                       onClick={() => handleAutomaticSearch(event.id, event.title, event.qualityProfileId || league?.qualityProfileId, part.name)}
-                                      className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition-colors flex items-center gap-2"
+                                      className="px-2 md:px-4 py-1 md:py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs md:text-sm font-medium rounded transition-colors flex items-center gap-1 md:gap-2"
                                       title={`Search for monitored ${part.label}`}
                                     >
-                                      <MagnifyingGlassIcon className="w-4 h-4" />
-                                      Auto Search
+                                      <MagnifyingGlassIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                                      <span className="hidden sm:inline">Auto</span>
                                     </button>
                                   </div>
                                 );

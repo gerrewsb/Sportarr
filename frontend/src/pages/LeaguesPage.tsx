@@ -182,39 +182,40 @@ export default function LeaguesPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
+      <div className="mb-4 md:mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Leagues</h1>
-            <p className="text-gray-400">
-              Manage your monitored leagues and competitions across all sports
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-1 md:mb-2">Leagues</h1>
+            <p className="text-sm md:text-base text-gray-400">
+              Manage your monitored leagues and competitions
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             {isSelectionMode ? (
               <button
                 onClick={exitSelectionMode}
-                className="px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 font-semibold transition-colors flex items-center gap-2"
+                className="px-3 md:px-6 py-2 md:py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 font-semibold transition-colors flex items-center gap-1 md:gap-2 text-sm md:text-base"
               >
-                <XMarkIcon className="h-5 w-5" />
-                Cancel
+                <XMarkIcon className="h-4 w-4 md:h-5 md:w-5" />
+                <span className="hidden sm:inline">Cancel</span>
               </button>
             ) : (
               <button
                 onClick={() => setIsSelectionMode(true)}
-                className="px-6 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 font-semibold transition-colors border border-red-900/30 flex items-center gap-2"
+                className="px-3 md:px-6 py-2 md:py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 font-semibold transition-colors border border-red-900/30 flex items-center gap-1 md:gap-2 text-sm md:text-base"
               >
-                <CheckIcon className="h-5 w-5" />
-                Select
+                <CheckIcon className="h-4 w-4 md:h-5 md:w-5" />
+                <span className="hidden sm:inline">Select</span>
               </button>
             )}
             <button
               onClick={() => navigate('/add-league/search')}
-              className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-colors"
+              className="px-3 md:px-6 py-2 md:py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-colors text-sm md:text-base"
             >
-              + Add League
+              <span className="sm:hidden">+ Add</span>
+              <span className="hidden sm:inline">+ Add League</span>
             </button>
           </div>
         </div>
@@ -222,24 +223,24 @@ export default function LeaguesPage() {
 
       {/* Sport Filter Tabs - Only show if user has leagues */}
       {sportFilters.length > 1 && (
-        <div className="mb-8">
-          <div className="flex gap-2 overflow-x-auto pb-2">
+        <div className="mb-4 md:mb-8">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
             {sportFilters.map(sport => (
               <button
                 key={sport.id}
                 onClick={() => setSelectedSport(sport.id)}
                 className={`
-                  flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap font-medium transition-all
+                  flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg whitespace-nowrap font-medium transition-all text-sm md:text-base
                   ${selectedSport === sport.id
                     ? 'bg-red-600 text-white'
                     : 'bg-gray-900 text-gray-400 hover:bg-gray-800 hover:text-white border border-red-900/30'
                   }
                 `}
               >
-                <span className="text-xl">{sport.icon}</span>
-                <span>{sport.name}</span>
+                <span className="text-lg md:text-xl">{sport.icon}</span>
+                <span className="hidden sm:inline">{sport.name}</span>
                 {sport.id !== 'all' && leaguesBySport[sport.id] && (
-                  <span className="ml-1 px-2 py-0.5 bg-black/30 rounded text-xs">
+                  <span className="ml-1 px-1.5 md:px-2 py-0.5 bg-black/30 rounded text-xs">
                     {leaguesBySport[sport.id]}
                   </span>
                 )}
@@ -250,48 +251,48 @@ export default function LeaguesPage() {
       )}
 
       {/* Search Bar */}
-      <div className="mb-8 max-w-2xl">
+      <div className="mb-4 md:mb-8 max-w-2xl">
         <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+          <div className="absolute inset-y-0 left-0 pl-3 md:pl-4 flex items-center pointer-events-none">
+            <MagnifyingGlassIcon className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
           </div>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search leagues..."
-            className="w-full pl-12 pr-4 py-3 bg-gray-900 border border-red-900/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all"
+            className="w-full pl-10 md:pl-12 pr-4 py-2 md:py-3 bg-gray-900 border border-red-900/30 rounded-lg text-sm md:text-base text-white placeholder-gray-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all"
           />
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-        <div className="bg-gray-900 border border-red-900/30 rounded-lg p-4">
-          <p className="text-gray-400 text-sm mb-1">Total Leagues</p>
-          <p className="text-3xl font-bold text-white">{leagues?.length || 0}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-4 mb-4 md:mb-8">
+        <div className="bg-gray-900 border border-red-900/30 rounded-lg p-3 md:p-4">
+          <p className="text-gray-400 text-xs md:text-sm mb-1">Total Leagues</p>
+          <p className="text-xl md:text-3xl font-bold text-white">{leagues?.length || 0}</p>
         </div>
-        <div className="bg-gray-900 border border-red-900/30 rounded-lg p-4">
-          <p className="text-gray-400 text-sm mb-1">Monitored Leagues</p>
-          <p className="text-3xl font-bold text-white">
+        <div className="bg-gray-900 border border-red-900/30 rounded-lg p-3 md:p-4">
+          <p className="text-gray-400 text-xs md:text-sm mb-1">Monitored</p>
+          <p className="text-xl md:text-3xl font-bold text-white">
             {leagues?.filter(l => l.monitored).length || 0}
           </p>
         </div>
-        <div className="bg-gray-900 border border-red-900/30 rounded-lg p-4">
-          <p className="text-gray-400 text-sm mb-1">Total Events</p>
-          <p className="text-3xl font-bold text-white">
+        <div className="bg-gray-900 border border-red-900/30 rounded-lg p-3 md:p-4">
+          <p className="text-gray-400 text-xs md:text-sm mb-1">Total Events</p>
+          <p className="text-xl md:text-3xl font-bold text-white">
             {leagues?.reduce((sum, league) => sum + (league.eventCount || 0), 0) || 0}
           </p>
         </div>
-        <div className="bg-gray-900 border border-red-900/30 rounded-lg p-4">
-          <p className="text-gray-400 text-sm mb-1">Monitored Events</p>
-          <p className="text-3xl font-bold text-white">
+        <div className="bg-gray-900 border border-red-900/30 rounded-lg p-3 md:p-4">
+          <p className="text-gray-400 text-xs md:text-sm mb-1">Monitored Events</p>
+          <p className="text-xl md:text-3xl font-bold text-white">
             {leagues?.reduce((sum, league) => sum + (league.monitoredEventCount || 0), 0) || 0}
           </p>
         </div>
-        <div className="bg-gray-900 border border-red-900/30 rounded-lg p-4">
-          <p className="text-gray-400 text-sm mb-1">Downloaded</p>
-          <p className="text-3xl font-bold text-white">
+        <div className="bg-gray-900 border border-red-900/30 rounded-lg p-3 md:p-4 col-span-2 sm:col-span-1">
+          <p className="text-gray-400 text-xs md:text-sm mb-1">Downloaded</p>
+          <p className="text-xl md:text-3xl font-bold text-white">
             {leagues?.reduce((sum, league) => sum + (league.fileCount || 0), 0) || 0}
           </p>
         </div>
@@ -308,7 +309,7 @@ export default function LeaguesPage() {
           </p>
         </div>
       ) : (
-        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 ${isSelectionMode && selectedLeagueIds.size > 0 ? 'pb-24' : ''}`}>
+        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 ${isSelectionMode && selectedLeagueIds.size > 0 ? 'pb-24' : ''}`}>
           {filteredLeagues.map((league) => {
             const isSelected = selectedLeagueIds.has(league.id);
             return (
@@ -451,31 +452,32 @@ export default function LeaguesPage() {
       {/* Floating Action Bar (when items are selected) */}
       {isSelectionMode && selectedLeagueIds.size > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-red-900/50 shadow-lg shadow-black/50 z-50">
-          <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <span className="text-white font-semibold">
+          <div className="max-w-7xl mx-auto px-4 md:px-8 py-3 md:py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 md:gap-4">
+              <span className="text-white font-semibold text-sm md:text-base">
                 {selectedLeagueIds.size} {selectedLeagueIds.size === 1 ? 'League' : 'Leagues'} Selected
               </span>
               <button
                 onClick={selectAllFiltered}
-                className="text-sm text-gray-400 hover:text-white transition-colors"
+                className="text-xs md:text-sm text-gray-400 hover:text-white transition-colors"
               >
                 Select All ({filteredLeagues.length})
               </button>
               <button
                 onClick={clearSelection}
-                className="text-sm text-gray-400 hover:text-white transition-colors"
+                className="text-xs md:text-sm text-gray-400 hover:text-white transition-colors"
               >
-                Clear Selection
+                Clear
               </button>
             </div>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowDeleteDialog(true)}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-colors flex items-center gap-2"
+                className="px-3 md:px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-colors flex items-center gap-2 text-sm md:text-base"
               >
-                <TrashIcon className="h-5 w-5" />
-                Delete Selected
+                <TrashIcon className="h-4 w-4 md:h-5 md:w-5" />
+                <span className="hidden sm:inline">Delete Selected</span>
+                <span className="sm:hidden">Delete</span>
               </button>
             </div>
           </div>

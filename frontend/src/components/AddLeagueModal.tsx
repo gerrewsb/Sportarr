@@ -491,49 +491,49 @@ export default function AddLeagueModal({ league, isOpen, onClose, onAdd, isAddin
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-lg bg-gradient-to-br from-gray-900 to-black border border-red-900/30 text-left align-middle shadow-xl transition-all">
+              <Dialog.Panel className="w-full max-w-4xl mx-2 md:mx-4 transform overflow-hidden rounded-lg bg-gradient-to-br from-gray-900 to-black border border-red-900/30 text-left align-middle shadow-xl transition-all">
                 {/* Header */}
-                <div className="border-b border-red-900/30 p-6">
+                <div className="border-b border-red-900/30 p-4 md:p-6">
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
                       {logoUrl && (
                         <img
                           src={logoUrl}
                           alt={league?.strLeague || 'League'}
-                          className="w-16 h-16 object-contain"
+                          className="w-10 h-10 md:w-16 md:h-16 object-contain flex-shrink-0"
                         />
                       )}
-                      <div>
-                        <Dialog.Title as="h3" className="text-2xl font-bold text-white">
+                      <div className="min-w-0">
+                        <Dialog.Title as="h3" className="text-lg md:text-2xl font-bold text-white truncate">
                           {editMode ? 'Edit ' : 'Add '}{league?.strLeague || ''}
                         </Dialog.Title>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="px-2 py-1 bg-red-600/20 text-red-400 text-xs rounded font-medium">
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <span className="px-2 py-0.5 md:py-1 bg-red-600/20 text-red-400 text-xs rounded font-medium">
                             {league?.strSport || ''}
                           </span>
                           {league?.strCountry && (
-                            <span className="text-sm text-gray-400">{league.strCountry}</span>
+                            <span className="text-xs md:text-sm text-gray-400">{league.strCountry}</span>
                           )}
                         </div>
                       </div>
                     </div>
                     <button
                       onClick={onClose}
-                      className="text-gray-400 hover:text-white transition-colors"
+                      className="text-gray-400 hover:text-white transition-colors flex-shrink-0 ml-2"
                     >
-                      <XMarkIcon className="w-6 h-6" />
+                      <XMarkIcon className="w-5 h-5 md:w-6 md:h-6" />
                     </button>
                   </div>
                 </div>
 
                 {/* Team Selection (for non-motorsport leagues) */}
                 {showTeamSelection && (
-                  <div className="p-6">
-                    <div className="mb-4">
-                      <h4 className="text-lg font-semibold text-white mb-2">
+                  <div className="p-4 md:p-6">
+                    <div className="mb-3 md:mb-4">
+                      <h4 className="text-base md:text-lg font-semibold text-white mb-1 md:mb-2">
                         Select Teams to Monitor
                       </h4>
-                      <p className="text-sm text-gray-400">
+                      <p className="text-xs md:text-sm text-gray-400">
                         Choose which teams you want to follow. Only events involving selected teams will be synced.
                         {selectedCount === 0 && (
                           <span className="text-yellow-500"> No teams selected = league will not be monitored.</span>

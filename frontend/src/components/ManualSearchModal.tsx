@@ -604,26 +604,26 @@ export default function ManualSearchModal({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-[98vw] max-w-none transform overflow-hidden rounded-lg bg-gradient-to-br from-gray-900 to-black border border-red-900/30 shadow-2xl transition-all">
+              <Dialog.Panel className="w-[98vw] max-w-none mx-2 md:mx-4 transform overflow-hidden rounded-lg bg-gradient-to-br from-gray-900 to-black border border-red-900/30 shadow-2xl transition-all">
                 {/* Header with Tabs */}
                 <div className="relative bg-gradient-to-r from-gray-900 via-red-950/20 to-gray-900 border-b border-red-900/30">
-                  <div className="px-6 py-4 flex items-center justify-between">
-                    <div>
-                      <h2 className="text-xl font-bold text-white">{getSearchTitle()}</h2>
+                  <div className="px-3 md:px-6 py-3 md:py-4 flex items-center justify-between">
+                    <div className="min-w-0 flex-1 mr-2">
+                      <h2 className="text-base md:text-xl font-bold text-white truncate">{getSearchTitle()}</h2>
                     </div>
                     <button
                       onClick={onClose}
-                      className="p-2 rounded-lg bg-black/50 hover:bg-black/70 transition-colors"
+                      className="p-1.5 md:p-2 rounded-lg bg-black/50 hover:bg-black/70 transition-colors flex-shrink-0"
                     >
-                      <XMarkIcon className="w-6 h-6 text-white" />
+                      <XMarkIcon className="w-5 h-5 md:w-6 md:h-6 text-white" />
                     </button>
                   </div>
 
                   {/* Tabs */}
-                  <div className="px-6 flex gap-1">
+                  <div className="px-3 md:px-6 flex gap-1">
                     <button
                       onClick={() => setActiveTab('search')}
-                      className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                      className={`px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium rounded-t-lg transition-colors ${
                         activeTab === 'search'
                           ? 'bg-gray-800 text-white border-t border-l border-r border-gray-700'
                           : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
@@ -633,7 +633,7 @@ export default function ManualSearchModal({
                     </button>
                     <button
                       onClick={() => setActiveTab('history')}
-                      className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                      className={`px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium rounded-t-lg transition-colors ${
                         activeTab === 'history'
                           ? 'bg-gray-800 text-white border-t border-l border-r border-gray-700'
                           : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
@@ -648,32 +648,33 @@ export default function ManualSearchModal({
                 {activeTab === 'search' && (
                   <>
                     {/* Search Controls */}
-                    <div className="px-6 py-3 border-b border-gray-800 flex items-center justify-between">
-                      <p className="text-gray-400 text-sm">
+                    <div className="px-3 md:px-6 py-2 md:py-3 border-b border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <p className="text-gray-400 text-xs md:text-sm hidden sm:block">
                         Search indexers for available releases
                       </p>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => setShowFilters(!showFilters)}
-                          className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors flex items-center gap-1.5 text-sm"
+                          className="px-2 md:px-3 py-1 md:py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors flex items-center gap-1 md:gap-1.5 text-xs md:text-sm"
                         >
-                          <FunnelIcon className="w-4 h-4" />
+                          <FunnelIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
                           Filter
                         </button>
                         <button
                           onClick={handleSearch}
                           disabled={isSearching}
-                          className="px-4 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white rounded transition-colors flex items-center gap-2 text-sm"
+                          className="px-3 md:px-4 py-1 md:py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white rounded transition-colors flex items-center gap-1.5 md:gap-2 text-xs md:text-sm"
                         >
                           {isSearching ? (
                             <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              <span>Searching...</span>
+                              <div className="animate-spin rounded-full h-3.5 w-3.5 md:h-4 md:w-4 border-b-2 border-white"></div>
+                              <span className="hidden sm:inline">Searching...</span>
                             </>
                           ) : (
                             <>
-                              <MagnifyingGlassIcon className="w-4 h-4" />
-                              <span>Search Indexers</span>
+                              <MagnifyingGlassIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                              <span className="hidden sm:inline">Search Indexers</span>
+                              <span className="sm:hidden">Search</span>
                             </>
                           )}
                         </button>

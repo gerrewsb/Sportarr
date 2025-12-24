@@ -210,33 +210,33 @@ export default function EventFileDetailModal({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-lg bg-gray-900 text-left align-middle shadow-xl transition-all border border-gray-700">
+              <Dialog.Panel className="w-full max-w-2xl mx-2 md:mx-4 transform overflow-hidden rounded-lg bg-gray-900 text-left align-middle shadow-xl transition-all border border-gray-700">
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-gray-700">
-                  <div>
-                    <Dialog.Title className="text-lg font-medium text-white">
+                <div className="flex items-center justify-between p-3 md:p-4 border-b border-gray-700">
+                  <div className="min-w-0 flex-1 mr-2">
+                    <Dialog.Title className="text-base md:text-lg font-medium text-white">
                       Event Files
                     </Dialog.Title>
-                    <p className="text-sm text-gray-400 mt-1">{eventTitle}</p>
+                    <p className="text-xs md:text-sm text-gray-400 mt-1 truncate">{eventTitle}</p>
                   </div>
                   <button
                     onClick={onClose}
-                    className="text-gray-400 hover:text-white transition-colors"
+                    className="text-gray-400 hover:text-white transition-colors flex-shrink-0"
                   >
-                    <XMarkIcon className="w-6 h-6" />
+                    <XMarkIcon className="w-5 h-5 md:w-6 md:h-6" />
                   </button>
                 </div>
 
                 {/* Summary */}
-                <div className="p-4 bg-gray-800/50 border-b border-gray-700">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2 text-gray-300">
-                        <FilmIcon className="w-5 h-5" />
+                <div className="p-3 md:p-4 bg-gray-800/50 border-b border-gray-700">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <div className="flex items-center gap-1.5 md:gap-2 text-gray-300 text-sm">
+                        <FilmIcon className="w-4 h-4 md:w-5 md:h-5" />
                         <span>{existingFiles.length} file{existingFiles.length !== 1 ? 's' : ''}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-gray-300">
-                        <FolderIcon className="w-5 h-5" />
+                      <div className="flex items-center gap-1.5 md:gap-2 text-gray-300 text-sm">
+                        <FolderIcon className="w-4 h-4 md:w-5 md:h-5" />
                         <span>{formatFileSize(totalSize)}</span>
                       </div>
                     </div>
@@ -247,9 +247,9 @@ export default function EventFileDetailModal({
                           setShowDeleteAllDialog(true);
                         }}
                         disabled={deleteAllFilesMutation.isPending || deleteFileMutation.isPending}
-                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 text-white text-sm font-medium rounded transition-colors flex items-center gap-2"
+                        className="px-2 md:px-3 py-1 md:py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 text-white text-xs md:text-sm font-medium rounded transition-colors flex items-center gap-1.5 md:gap-2"
                       >
-                        <TrashIcon className="w-4 h-4" />
+                        <TrashIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
                         Delete All
                       </button>
                     )}
