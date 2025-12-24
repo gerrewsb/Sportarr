@@ -18,7 +18,7 @@ import {
 import apiClient from '../api/client';
 import ManualImportModal from '../components/ManualImportModal';
 
-type TabType = 'queue' | 'history' | 'blocklist';
+type TabType = 'queue' | 'history' | 'blocklist' | 'grabHistory';
 
 interface Event {
   id: number;
@@ -102,6 +102,32 @@ interface BlocklistItem {
   part?: string; // For multi-part events (e.g., "Early Prelims", "Prelims", "Main Card")
 }
 
+interface GrabHistoryItem {
+  id: number;
+  eventId: number;
+  eventTitle?: string;
+  leagueName?: string;
+  title: string;
+  indexer: string;
+  indexerId?: number;
+  protocol: string;
+  size: number;
+  quality?: string;
+  codec?: string;
+  source?: string;
+  qualityScore: number;
+  customFormatScore: number;
+  partName?: string;
+  grabbedAt: string;
+  wasImported: boolean;
+  importedAt?: string;
+  fileExists: boolean;
+  lastRegrabAttempt?: string;
+  regrabCount: number;
+  hasDownloadUrl: boolean;
+  hasTorrentHash: boolean;
+}
+
 interface PendingImport {
   id: number;
   downloadClientId: number;
@@ -173,6 +199,10 @@ export default function ActivityPage() {
   const [pendingImports, setPendingImports] = useState<PendingImport[]>([]);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [blocklistItems, setBlocklistItems] = useState<BlocklistItem[]>([]);
+  const [grabHistoryItems, setGrabHistoryItems] = useState<GrabHistoryItem[]>([]);
+  const [grabHistoryMissingOnly, setGrabHistoryMissingOnly] = useState(false);
+  const [regrabbing, setRegrabbing] = useState<number | null>(null);
+  const [bulkRegrabbing, setBulkRegrabbing] = useState(false);
   const [selectedPendingImport, setSelectedPendingImport] = useState<PendingImport | null>(null);
   const [isLoading, setIsLoading] = useState(true); // Only true for initial load
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -295,6 +325,8 @@ export default function ActivityPage() {
       loadQueue(showLoading);
     } else if (activeTab === 'history') {
       loadHistory(showLoading);
+    } else if (activeTab === 'grabHistory') {
+      loadGrabHistory(showLoading);
     } else {
       loadBlocklist(showLoading);
     }
@@ -348,6 +380,57 @@ export default function ActivityPage() {
         setIsLoading(false);
         setIsInitialLoad(false);
       }
+    }
+  };
+
+  const loadGrabHistory = async (showLoading = false) => {
+    try {
+      if (showLoading) setIsLoading(true);
+      const response = await apiClient.get(`/grab-history?page=${page}&pageSize=50&missingOnly=${grabHistoryMissingOnly}`);
+      setGrabHistoryItems(response.data.history);
+      setTotalPages(response.data.totalPages);
+    } catch (error) {
+      console.error('Failed to load grab history:', error);
+    } finally {
+      if (showLoading) {
+        setIsLoading(false);
+        setIsInitialLoad(false);
+      }
+    }
+  };
+
+  // Reload grab history when filter changes
+  React.useEffect(() => {
+    if (activeTab === 'grabHistory') {
+      loadGrabHistory(true);
+    }
+  }, [grabHistoryMissingOnly]);
+
+  const handleRegrab = async (id: number) => {
+    try {
+      setRegrabbing(id);
+      await apiClient.post(`/grab-history/${id}/regrab`);
+      loadGrabHistory();
+    } catch (error: any) {
+      console.error('Failed to re-grab:', error);
+      alert(error.response?.data?.error || 'Failed to re-grab release');
+    } finally {
+      setRegrabbing(null);
+    }
+  };
+
+  const handleBulkRegrab = async () => {
+    try {
+      setBulkRegrabbing(true);
+      const response = await apiClient.post('/grab-history/regrab-missing');
+      const data = response.data;
+      alert(`Re-grabbed ${data.regrabbed} releases. ${data.failed} failed.`);
+      loadGrabHistory();
+    } catch (error: any) {
+      console.error('Failed to bulk re-grab:', error);
+      alert(error.response?.data?.error || 'Failed to re-grab missing releases');
+    } finally {
+      setBulkRegrabbing(false);
     }
   };
 
@@ -854,6 +937,16 @@ export default function ActivityPage() {
               </span>
             )}
           </button>
+          <button
+            onClick={() => { setActiveTab('grabHistory'); setPage(1); }}
+            className={`px-6 py-2 rounded-md transition-all ${
+              activeTab === 'grabHistory'
+                ? 'bg-red-600 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            Grab History
+          </button>
         </div>
 
         {/* Content */}
@@ -1112,7 +1205,7 @@ export default function ActivityPage() {
               </>
             )}
           </div>
-        ) : (
+        ) : activeTab === 'blocklist' ? (
           // Blocklist Tab
           <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-700 rounded-lg overflow-hidden">
             {blocklistItems.length === 0 ? (
@@ -1174,6 +1267,176 @@ export default function ActivityPage() {
                                 title="Remove from Blocklist"
                               >
                                 <TrashIcon className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="px-6 py-4 border-t border-gray-700 flex items-center justify-between">
+                    <button
+                      onClick={() => setPage(Math.max(1, page - 1))}
+                      disabled={page === 1}
+                      className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition-colors"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-gray-400">
+                      Page {page} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setPage(Math.min(totalPages, page + 1))}
+                      disabled={page === totalPages}
+                      className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          // Grab History Tab
+          <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-700 rounded-lg overflow-hidden">
+            {/* Filter Bar */}
+            <div className="px-4 py-3 bg-gray-800 border-b border-gray-700 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-gray-300 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={grabHistoryMissingOnly}
+                    onChange={(e) => setGrabHistoryMissingOnly(e.target.checked)}
+                    className="w-4 h-4 bg-gray-700 border-gray-600 rounded text-red-600 focus:ring-red-600 focus:ring-2"
+                  />
+                  Show Missing Files Only
+                </label>
+              </div>
+              <button
+                onClick={handleBulkRegrab}
+                disabled={bulkRegrabbing || grabHistoryItems.filter(i => !i.fileExists && (i.hasDownloadUrl || i.hasTorrentHash)).length === 0}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-2"
+              >
+                {bulkRegrabbing ? (
+                  <>
+                    <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                    Re-grabbing...
+                  </>
+                ) : (
+                  <>
+                    <ArrowDownTrayIcon className="w-4 h-4" />
+                    Re-grab All Missing
+                  </>
+                )}
+              </button>
+            </div>
+
+            {grabHistoryItems.length === 0 ? (
+              <div className="p-12 text-center text-gray-400">
+                <ArrowDownTrayIcon className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <p className="text-lg">No grab history</p>
+                <p className="text-sm mt-2">
+                  {grabHistoryMissingOnly
+                    ? 'No missing files found in grab history'
+                    : 'Grabbed releases will appear here once downloads are sent to clients'}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-800 text-gray-300 text-xs">
+                        <th className="px-3 py-2 text-left font-medium">Event</th>
+                        <th className="px-3 py-2 text-left font-medium">Release</th>
+                        <th className="px-3 py-2 text-center font-medium">Quality</th>
+                        <th className="px-3 py-2 text-center font-medium">Indexer</th>
+                        <th className="px-3 py-2 text-center font-medium">Protocol</th>
+                        <th className="px-3 py-2 text-center font-medium">Size</th>
+                        <th className="px-3 py-2 text-center font-medium">Status</th>
+                        <th className="px-3 py-2 text-center font-medium">Grabbed</th>
+                        <th className="px-3 py-2 text-right font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-700">
+                      {grabHistoryItems.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-800/50 transition-colors">
+                          <td className="px-3 py-2 min-w-[150px]">
+                            <div className="text-white text-xs font-medium break-words">
+                              {item.eventTitle || 'Unknown Event'}
+                              {item.partName && <span className="text-blue-400 ml-1">({item.partName})</span>}
+                            </div>
+                            <div className="text-xs text-gray-400 break-words">{item.leagueName}</div>
+                          </td>
+                          <td className="px-3 py-2 min-w-[200px]">
+                            <div className="text-gray-300 text-xs break-words">{item.title}</div>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <span className="px-1.5 py-0.5 bg-purple-900/30 text-purple-400 text-xs rounded">
+                              {item.quality || 'Unknown'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <span className="text-gray-400 text-xs">{item.indexer}</span>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <span className="px-1.5 py-0.5 bg-blue-900/30 text-blue-400 text-xs rounded uppercase">
+                              {item.protocol}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <span className="text-gray-300 text-xs">{formatBytes(item.size)}</span>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              {item.fileExists ? (
+                                <span className="flex items-center gap-1 text-green-400 text-xs">
+                                  <CheckCircleIcon className="w-4 h-4" />
+                                  File Exists
+                                </span>
+                              ) : item.wasImported ? (
+                                <span className="flex items-center gap-1 text-orange-400 text-xs">
+                                  <ExclamationTriangleIcon className="w-4 h-4" />
+                                  Missing
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 text-gray-400 text-xs">
+                                  <ClockIcon className="w-4 h-4" />
+                                  Not Imported
+                                </span>
+                              )}
+                              {item.regrabCount > 0 && (
+                                <span className="text-xs text-gray-500">
+                                  Re-grabbed {item.regrabCount}x
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <span className="text-gray-400 text-xs">{formatDate(item.grabbedAt)}</span>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => handleRegrab(item.id)}
+                                disabled={regrabbing === item.id || (!item.hasDownloadUrl && !item.hasTorrentHash)}
+                                className="p-1.5 text-green-400 hover:text-green-300 hover:bg-green-900/30 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors"
+                                title={
+                                  !item.hasDownloadUrl && !item.hasTorrentHash
+                                    ? 'No download URL or torrent hash available'
+                                    : 'Re-grab this release'
+                                }
+                              >
+                                {regrabbing === item.id ? (
+                                  <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <ArrowDownTrayIcon className="w-4 h-4" />
+                                )}
                               </button>
                             </div>
                           </td>
