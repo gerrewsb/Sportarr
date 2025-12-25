@@ -14,6 +14,11 @@ import {
   CalendarDaysIcon,
   PlusIcon,
   ArrowDownOnSquareIcon,
+  Cog6ToothIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  CpuChipIcon,
+  FolderIcon,
 } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
 import apiClient from '../../api/client';
@@ -67,6 +72,77 @@ interface IptvChannel {
   status: string;
 }
 
+// DVR Settings Types
+interface DvrSettings {
+  defaultProfileId: number;
+  recordingPath: string;
+  fileNamingPattern: string;
+  prePaddingMinutes: number;
+  postPaddingMinutes: number;
+  maxConcurrentRecordings: number;
+  deleteAfterImport: boolean;
+  recordingRetentionDays: number;
+  hardwareAcceleration: number;
+  ffmpegPath: string;
+  enableReconnect: boolean;
+  maxReconnectAttempts: number;
+  reconnectDelaySeconds: number;
+}
+
+interface DvrQualityProfile {
+  id: number;
+  name: string;
+  preset: number;
+  videoCodec: string;
+  audioCodec: string;
+  videoBitrate: number;
+  audioBitrate: number;
+  resolution: string;
+  frameRate: string;
+  encodingPreset: string;
+  container: string;
+  isDefault: boolean;
+  estimatedSizePerHourMb: number;
+  estimatedQualityScore: number;
+  estimatedCustomFormatScore: number;
+  expectedQualityName: string;
+  expectedFormatDescription: string;
+}
+
+interface HardwareAccelerationInfo {
+  type: number;
+  name: string;
+  description: string;
+  isAvailable: boolean;
+}
+
+// Hardware acceleration enum values
+const HardwareAccelerationOptions: { value: number; label: string; description: string }[] = [
+  { value: 0, label: 'None', description: 'Software encoding only (CPU)' },
+  { value: 1, label: 'NVENC (NVIDIA)', description: 'NVIDIA GPU hardware encoding' },
+  { value: 2, label: 'QuickSync (Intel)', description: 'Intel GPU hardware encoding' },
+  { value: 3, label: 'AMF (AMD)', description: 'AMD GPU hardware encoding' },
+  { value: 4, label: 'VAAPI (Linux)', description: 'Linux hardware encoding (Intel/AMD)' },
+  { value: 5, label: 'VideoToolbox (macOS)', description: 'macOS hardware encoding' },
+  { value: 99, label: 'Auto-detect', description: 'Automatically detect best available encoder' },
+];
+
+const defaultDvrSettings: DvrSettings = {
+  defaultProfileId: 1,
+  recordingPath: '',
+  fileNamingPattern: '{Title} - {Date}',
+  prePaddingMinutes: 5,
+  postPaddingMinutes: 30,
+  maxConcurrentRecordings: 0,
+  deleteAfterImport: false,
+  recordingRetentionDays: 0,
+  hardwareAcceleration: 99,
+  ffmpegPath: '',
+  enableReconnect: true,
+  maxReconnectAttempts: 5,
+  reconnectDelaySeconds: 5,
+};
+
 const defaultFormData: ScheduleFormData = {
   eventTitle: '',
   channelId: 0,
@@ -96,10 +172,22 @@ export default function DvrRecordingsSettings() {
   // FFmpeg state
   const [ffmpegAvailable, setFfmpegAvailable] = useState<boolean | null>(null);
 
+  // DVR Settings state
+  const [dvrSettings, setDvrSettings] = useState<DvrSettings>(defaultDvrSettings);
+  const [qualityProfiles, setQualityProfiles] = useState<DvrQualityProfile[]>([]);
+  const [availableHwAccel, setAvailableHwAccel] = useState<HardwareAccelerationInfo[]>([]);
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [settingsHasChanges, setSettingsHasChanges] = useState(false);
+  const [originalSettings, setOriginalSettings] = useState<DvrSettings>(defaultDvrSettings);
+
   // Load data on mount
   useEffect(() => {
     loadData();
     checkFfmpeg();
+    loadDvrSettings();
+    loadQualityProfiles();
+    loadHardwareAcceleration();
     // Refresh every 30 seconds to update recording statuses
     const interval = setInterval(loadRecordings, 30000);
     return () => clearInterval(interval);
@@ -156,6 +244,63 @@ export default function DvrRecordingsSettings() {
     } catch (err: any) {
       setFfmpegAvailable(false);
     }
+  };
+
+  const loadDvrSettings = async () => {
+    try {
+      const { data } = await apiClient.get<DvrSettings>('/dvr/settings');
+      setDvrSettings(data);
+      setOriginalSettings(data);
+      setSettingsHasChanges(false);
+    } catch (err: any) {
+      console.error('Failed to load DVR settings:', err);
+    }
+  };
+
+  const loadQualityProfiles = async () => {
+    try {
+      const { data } = await apiClient.get<DvrQualityProfile[]>('/dvr/profiles');
+      setQualityProfiles(data);
+    } catch (err: any) {
+      console.error('Failed to load quality profiles:', err);
+    }
+  };
+
+  const loadHardwareAcceleration = async () => {
+    try {
+      const { data } = await apiClient.get<HardwareAccelerationInfo[]>('/dvr/hardware-acceleration');
+      setAvailableHwAccel(data);
+    } catch (err: any) {
+      console.error('Failed to load hardware acceleration info:', err);
+    }
+  };
+
+  const handleSettingsChange = (field: keyof DvrSettings, value: any) => {
+    setDvrSettings(prev => {
+      const updated = { ...prev, [field]: value };
+      // Check if settings have changed from original
+      setSettingsHasChanges(JSON.stringify(updated) !== JSON.stringify(originalSettings));
+      return updated;
+    });
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      setIsSavingSettings(true);
+      await apiClient.put('/dvr/settings', dvrSettings);
+      setOriginalSettings(dvrSettings);
+      setSettingsHasChanges(false);
+      toast.success('DVR Settings Saved', { description: 'Your DVR settings have been saved' });
+    } catch (err: any) {
+      toast.error('Failed to save settings', { description: err.message });
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  const handleResetSettings = () => {
+    setDvrSettings(originalSettings);
+    setSettingsHasChanges(false);
   };
 
   const handleFormChange = (field: keyof ScheduleFormData, value: any) => {
@@ -413,6 +558,288 @@ export default function DvrRecordingsSettings() {
               </ul>
             </div>
           </div>
+        </div>
+
+        {/* DVR Settings Section */}
+        <div className="mb-8 bg-gradient-to-br from-gray-900 to-black border border-red-900/30 rounded-lg overflow-hidden">
+          {/* Collapsible Header */}
+          <button
+            onClick={() => setSettingsExpanded(!settingsExpanded)}
+            className="w-full flex items-center justify-between p-6 hover:bg-gray-800/30 transition-colors"
+          >
+            <div className="flex items-center">
+              <Cog6ToothIcon className="w-6 h-6 text-red-400 mr-3" />
+              <div className="text-left">
+                <h3 className="text-xl font-semibold text-white">DVR Settings</h3>
+                <p className="text-sm text-gray-400">Quality profiles, hardware acceleration, and recording options</p>
+              </div>
+            </div>
+            {settingsExpanded ? (
+              <ChevronUpIcon className="w-5 h-5 text-gray-400" />
+            ) : (
+              <ChevronDownIcon className="w-5 h-5 text-gray-400" />
+            )}
+          </button>
+
+          {/* Settings Content */}
+          {settingsExpanded && (
+            <div className="p-6 pt-0 border-t border-gray-800">
+              {/* Quality Profile Selection */}
+              <div className="mb-8">
+                <h4 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <FilmIcon className="w-5 h-5 mr-2 text-purple-400" />
+                  Quality Profile
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {qualityProfiles.map((profile) => (
+                    <button
+                      key={profile.id}
+                      onClick={() => handleSettingsChange('defaultProfileId', profile.id)}
+                      className={`p-4 rounded-lg border transition-all text-left ${
+                        dvrSettings.defaultProfileId === profile.id
+                          ? 'border-red-600 bg-red-900/20'
+                          : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className="font-medium text-white mb-1">{profile.name}</div>
+                      <div className="text-xs text-gray-400 mb-2">{profile.expectedFormatDescription}</div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500">{profile.expectedQualityName}</span>
+                        {profile.estimatedSizePerHourMb > 0 && (
+                          <span className="text-gray-500">~{(profile.estimatedSizePerHourMb / 1024).toFixed(1)} GB/hr</span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Hardware Acceleration */}
+              <div className="mb-8">
+                <h4 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <CpuChipIcon className="w-5 h-5 mr-2 text-blue-400" />
+                  Hardware Acceleration
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Encoding Method</label>
+                    <select
+                      value={dvrSettings.hardwareAcceleration}
+                      onChange={(e) => handleSettingsChange('hardwareAcceleration', parseInt(e.target.value))}
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
+                    >
+                      {HardwareAccelerationOptions.map((opt) => {
+                        const hwInfo = availableHwAccel.find(h => h.type === opt.value);
+                        const isAvailable = opt.value === 0 || opt.value === 99 || hwInfo?.isAvailable;
+                        return (
+                          <option key={opt.value} value={opt.value} disabled={!isAvailable}>
+                            {opt.label} {!isAvailable && '(Not Available)'}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {HardwareAccelerationOptions.find(o => o.value === dvrSettings.hardwareAcceleration)?.description}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">FFmpeg Path (Optional)</label>
+                    <input
+                      type="text"
+                      value={dvrSettings.ffmpegPath}
+                      onChange={(e) => handleSettingsChange('ffmpegPath', e.target.value)}
+                      placeholder="Leave empty to use system PATH"
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Custom path to FFmpeg binary</p>
+                  </div>
+                </div>
+                {/* Available Hardware Info */}
+                {availableHwAccel.length > 0 && (
+                  <div className="mt-4 p-3 bg-gray-800/50 rounded-lg">
+                    <p className="text-sm text-gray-400 mb-2">Detected Hardware Encoders:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {availableHwAccel.filter(h => h.isAvailable).map((hw) => (
+                        <span key={hw.type} className="px-2 py-1 bg-green-900/30 text-green-400 text-xs rounded">
+                          {hw.name}
+                        </span>
+                      ))}
+                      {availableHwAccel.filter(h => h.isAvailable).length === 0 && (
+                        <span className="text-gray-500 text-xs">No hardware encoders detected - using software encoding</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Recording Path and Naming */}
+              <div className="mb-8">
+                <h4 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <FolderIcon className="w-5 h-5 mr-2 text-yellow-400" />
+                  Storage Settings
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Recording Path</label>
+                    <input
+                      type="text"
+                      value={dvrSettings.recordingPath}
+                      onChange={(e) => handleSettingsChange('recordingPath', e.target.value)}
+                      placeholder="Leave empty to use root folder"
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Where to save recordings (empty = root folder)</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">File Naming Pattern</label>
+                    <input
+                      type="text"
+                      value={dvrSettings.fileNamingPattern}
+                      onChange={(e) => handleSettingsChange('fileNamingPattern', e.target.value)}
+                      placeholder="{Title} - {Date}"
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Available: {'{Title}'}, {'{Date}'}, {'{League}'}, {'{Channel}'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Padding Settings */}
+              <div className="mb-8">
+                <h4 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <ClockIcon className="w-5 h-5 mr-2 text-green-400" />
+                  Recording Padding
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Pre-Padding (minutes)</label>
+                    <input
+                      type="number"
+                      value={dvrSettings.prePaddingMinutes}
+                      onChange={(e) => handleSettingsChange('prePaddingMinutes', parseInt(e.target.value) || 0)}
+                      min="0"
+                      max="60"
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Start recording before scheduled time</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Post-Padding (minutes)</label>
+                    <input
+                      type="number"
+                      value={dvrSettings.postPaddingMinutes}
+                      onChange={(e) => handleSettingsChange('postPaddingMinutes', parseInt(e.target.value) || 0)}
+                      min="0"
+                      max="180"
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Continue recording after scheduled end (for overtime)</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Advanced Settings */}
+              <div className="mb-8">
+                <h4 className="text-lg font-semibold text-white mb-4">Advanced Settings</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Max Concurrent Recordings</label>
+                    <input
+                      type="number"
+                      value={dvrSettings.maxConcurrentRecordings}
+                      onChange={(e) => handleSettingsChange('maxConcurrentRecordings', parseInt(e.target.value) || 0)}
+                      min="0"
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">0 = unlimited</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Recording Retention (days)</label>
+                    <input
+                      type="number"
+                      value={dvrSettings.recordingRetentionDays}
+                      onChange={(e) => handleSettingsChange('recordingRetentionDays', parseInt(e.target.value) || 0)}
+                      min="0"
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">0 = keep forever</p>
+                  </div>
+                  <div className="flex items-center">
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={dvrSettings.deleteAfterImport}
+                        onChange={(e) => handleSettingsChange('deleteAfterImport', e.target.checked)}
+                        className="w-4 h-4 text-red-600 bg-gray-800 border-gray-700 rounded focus:ring-red-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-300">Delete after import</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Reconnection Settings */}
+              <div className="mb-6">
+                <h4 className="text-lg font-semibold text-white mb-4">Stream Reconnection</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex items-center">
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={dvrSettings.enableReconnect}
+                        onChange={(e) => handleSettingsChange('enableReconnect', e.target.checked)}
+                        className="w-4 h-4 text-red-600 bg-gray-800 border-gray-700 rounded focus:ring-red-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-300">Enable auto-reconnect</span>
+                    </label>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Max Reconnect Attempts</label>
+                    <input
+                      type="number"
+                      value={dvrSettings.maxReconnectAttempts}
+                      onChange={(e) => handleSettingsChange('maxReconnectAttempts', parseInt(e.target.value) || 1)}
+                      min="1"
+                      max="20"
+                      disabled={!dvrSettings.enableReconnect}
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600 disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Reconnect Delay (seconds)</label>
+                    <input
+                      type="number"
+                      value={dvrSettings.reconnectDelaySeconds}
+                      onChange={(e) => handleSettingsChange('reconnectDelaySeconds', parseInt(e.target.value) || 1)}
+                      min="1"
+                      max="60"
+                      disabled={!dvrSettings.enableReconnect}
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600 disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Save/Reset Buttons */}
+              {settingsHasChanges && (
+                <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-800">
+                  <button
+                    onClick={handleResetSettings}
+                    className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                  >
+                    Reset
+                  </button>
+                  <button
+                    onClick={handleSaveSettings}
+                    disabled={isSavingSettings}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {isSavingSettings ? 'Saving...' : 'Save Settings'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Recordings List */}
