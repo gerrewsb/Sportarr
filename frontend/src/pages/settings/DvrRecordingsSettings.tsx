@@ -169,6 +169,10 @@ export default function DvrRecordingsSettings() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
   const [viewingRecording, setViewingRecording] = useState<DvrRecording | null>(null);
 
+  // Channel search state for modal
+  const [channelSearch, setChannelSearch] = useState('');
+  const [showChannelDropdown, setShowChannelDropdown] = useState(false);
+
   // FFmpeg state
   const [ffmpegAvailable, setFfmpegAvailable] = useState<boolean | null>(null);
 
@@ -457,6 +461,21 @@ export default function DvrRecordingsSettings() {
       formData.channelId > 0 &&
       formData.scheduledStart !== '' &&
       formData.scheduledEnd !== '';
+  };
+
+  // Filter channels based on search query
+  const filteredChannels = channels.filter(channel =>
+    channel.name.toLowerCase().includes(channelSearch.toLowerCase())
+  );
+
+  // Get selected channel name
+  const selectedChannel = channels.find(c => c.id === formData.channelId);
+
+  // Handle channel selection
+  const handleChannelSelect = (channelId: number) => {
+    handleFormChange('channelId', channelId);
+    setChannelSearch('');
+    setShowChannelDropdown(false);
   };
 
   return (
@@ -879,7 +898,7 @@ export default function DvrRecordingsSettings() {
                 }`}
               >
                 <PlusIcon className="w-4 h-4 mr-2" />
-                Schedule Recording
+                Manual Recording
               </button>
             </div>
           </div>
@@ -1038,16 +1057,23 @@ export default function DvrRecordingsSettings() {
           )}
         </div>
 
-        {/* Schedule Recording Modal */}
+        {/* Schedule Manual Recording Modal */}
         {showScheduleModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-gradient-to-br from-gray-900 to-black border border-red-900/50 rounded-lg p-6 max-w-lg w-full my-8">
+            <div className="bg-gradient-to-br from-gray-900 to-black border border-red-900/50 rounded-lg p-8 max-w-3xl w-full my-8">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-2xl font-bold text-white">Schedule Recording</h3>
+                <div>
+                  <h3 className="text-2xl font-bold text-white">Schedule Manual Recording</h3>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Record any channel at a specific time. For automatic event recording, map channels to leagues in IPTV Channels.
+                  </p>
+                </div>
                 <button
                   onClick={() => {
                     setShowScheduleModal(false);
                     setFormData(defaultFormData);
+                    setChannelSearch('');
+                    setShowChannelDropdown(false);
                   }}
                   className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors"
                 >
@@ -1055,47 +1081,104 @@ export default function DvrRecordingsSettings() {
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-6">
+                {/* Event Title */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Event Title *</label>
                   <input
                     type="text"
                     value={formData.eventTitle}
                     onChange={(e) => handleFormChange('eventTitle', e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
                     placeholder="e.g., NFL: Patriots vs Cowboys"
                   />
                 </div>
 
-                <div>
+                {/* Searchable Channel Selector */}
+                <div className="relative">
                   <label className="block text-sm font-medium text-gray-300 mb-2">Channel *</label>
-                  <select
-                    value={formData.channelId}
-                    onChange={(e) => handleFormChange('channelId', parseInt(e.target.value))}
-                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
-                  >
-                    <option value={0}>Select a channel...</option>
-                    {channels.map((channel) => (
-                      <option key={channel.id} value={channel.id}>
-                        {channel.name}
-                      </option>
-                    ))}
-                  </select>
-                  {channels.length === 0 && (
-                    <p className="text-xs text-yellow-400 mt-1">
-                      No enabled channels available. Enable channels in IPTV Channels settings.
-                    </p>
+
+                  {/* Selected channel display or search input */}
+                  {selectedChannel && !showChannelDropdown ? (
+                    <div
+                      onClick={() => setShowChannelDropdown(true)}
+                      className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white cursor-pointer hover:border-gray-600 flex items-center justify-between"
+                    >
+                      <span>{selectedChannel.name}</span>
+                      <span className="text-gray-500 text-sm">Click to change</span>
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={channelSearch}
+                      onChange={(e) => {
+                        setChannelSearch(e.target.value);
+                        setShowChannelDropdown(true);
+                      }}
+                      onFocus={() => setShowChannelDropdown(true)}
+                      className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
+                      placeholder="Type to search channels..."
+                    />
+                  )}
+
+                  {/* Channel dropdown */}
+                  {showChannelDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                      {filteredChannels.length === 0 ? (
+                        <div className="px-4 py-3 text-gray-500 text-center">
+                          {channels.length === 0
+                            ? 'No enabled channels available. Enable channels in IPTV Channels settings.'
+                            : 'No channels match your search'}
+                        </div>
+                      ) : (
+                        <>
+                          <div className="sticky top-0 bg-gray-800 px-4 py-2 border-b border-gray-700">
+                            <span className="text-xs text-gray-500">
+                              {filteredChannels.length} of {channels.length} channels
+                            </span>
+                          </div>
+                          {filteredChannels.slice(0, 100).map((channel) => (
+                            <button
+                              key={channel.id}
+                              onClick={() => handleChannelSelect(channel.id)}
+                              className={`w-full px-4 py-3 text-left hover:bg-gray-700 transition-colors flex items-center justify-between ${
+                                formData.channelId === channel.id ? 'bg-red-900/30 text-red-400' : 'text-white'
+                              }`}
+                            >
+                              <span className="truncate">{channel.name}</span>
+                              {formData.channelId === channel.id && (
+                                <CheckCircleIcon className="w-5 h-5 text-red-400 flex-shrink-0 ml-2" />
+                              )}
+                            </button>
+                          ))}
+                          {filteredChannels.length > 100 && (
+                            <div className="px-4 py-2 text-xs text-gray-500 text-center border-t border-gray-700">
+                              Showing first 100 results. Type to narrow search.
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Click outside to close dropdown */}
+                  {showChannelDropdown && (
+                    <div
+                      className="fixed inset-0 z-0"
+                      onClick={() => setShowChannelDropdown(false)}
+                    />
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {/* Date/Time Selection */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Start Time *</label>
                     <input
                       type="datetime-local"
                       value={formData.scheduledStart}
                       onChange={(e) => handleFormChange('scheduledStart', e.target.value)}
-                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
+                      className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
                     />
                   </div>
                   <div>
@@ -1109,7 +1192,8 @@ export default function DvrRecordingsSettings() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {/* Padding Settings */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Pre-padding (minutes)</label>
                     <input
@@ -1118,9 +1202,9 @@ export default function DvrRecordingsSettings() {
                       onChange={(e) => handleFormChange('prePadding', parseInt(e.target.value) || 0)}
                       min="0"
                       max="60"
-                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
+                      className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Start recording early</p>
+                    <p className="text-xs text-gray-500 mt-1">Start recording before scheduled time</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Post-padding (minutes)</label>
@@ -1130,33 +1214,39 @@ export default function DvrRecordingsSettings() {
                       onChange={(e) => handleFormChange('postPadding', parseInt(e.target.value) || 0)}
                       min="0"
                       max="120"
-                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
+                      className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-600"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Continue recording after</p>
+                    <p className="text-xs text-gray-500 mt-1">Continue recording after scheduled end</p>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-6 pt-6 border-t border-gray-800 flex items-center justify-end space-x-3">
+              <div className="mt-8 pt-6 border-t border-gray-800 flex items-center justify-end space-x-3">
                 <button
                   onClick={() => {
                     setShowScheduleModal(false);
                     setFormData(defaultFormData);
+                    setChannelSearch('');
+                    setShowChannelDropdown(false);
                   }}
-                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                  className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleScheduleRecording}
+                  onClick={() => {
+                    handleScheduleRecording();
+                    setChannelSearch('');
+                    setShowChannelDropdown(false);
+                  }}
                   disabled={!isFormValid()}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
+                  className={`px-6 py-3 rounded-lg transition-colors ${
                     isFormValid()
                       ? 'bg-red-600 hover:bg-red-700 text-white'
                       : 'bg-gray-700 text-gray-500 cursor-not-allowed'
                   }`}
                 >
-                  Schedule
+                  Schedule Recording
                 </button>
               </div>
             </div>
