@@ -138,6 +138,20 @@ export default function StreamPlayerModal({
     setLogs([]);
   }, [channelId]);
 
+  // Log when modal opens to verify player support
+  useEffect(() => {
+    if (isOpen && streamUrl) {
+      log('info', 'Modal opened', {
+        channelId,
+        channelName,
+        streamUrl: streamUrl.substring(0, 50) + '...',
+        hlsSupported: Hls.isSupported(),
+        mpegtsSupported: mpegts.isSupported(),
+        hasVideoRef: !!videoRef.current,
+      });
+    }
+  }, [isOpen, streamUrl, channelId, channelName]);
+
   // Fetch debug info from backend
   const fetchDebugInfo = async () => {
     if (!channelId) {
