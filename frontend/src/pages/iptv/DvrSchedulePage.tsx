@@ -357,16 +357,16 @@ export default function DvrSchedulePage() {
                 <div
                   key={day.toISOString()}
                   className={`bg-gradient-to-br from-gray-900 to-black border rounded-lg overflow-hidden min-h-[100px] md:min-h-[200px] ${
-                    today ? 'border-red-600 shadow-lg shadow-red-900/30' : 'border-red-900/30'
+                    today ? 'border-amber-500 shadow-lg shadow-amber-900/30' : 'border-red-900/30'
                   }`}
                 >
                   {/* Day Header */}
-                  <div className={`px-2 md:px-3 py-1.5 md:py-2 border-b ${today ? 'bg-red-950/40 border-red-900/40' : 'bg-gray-800/30 border-red-900/20'}`}>
+                  <div className={`px-2 md:px-3 py-1.5 md:py-2 border-b ${today ? 'bg-amber-950/40 border-amber-900/40' : 'bg-gray-800/30 border-red-900/20'}`}>
                     <div className="flex md:block items-center gap-2">
                       <div className="text-xs text-gray-400 font-medium">
                         {dayNames[index]}
                       </div>
-                      <div className={`text-base md:text-lg font-bold ${today ? 'text-red-400' : 'text-white'}`}>
+                      <div className={`text-base md:text-lg font-bold ${today ? 'text-amber-400' : 'text-white'}`}>
                         {day.getDate()}
                       </div>
                     </div>
@@ -377,11 +377,12 @@ export default function DvrSchedulePage() {
                     {dayRecordings.length > 0 ? (
                       dayRecordings.map(recording => {
                         const statusColors = getStatusColors(recording.status);
+                        const isRecording = recording.status === 'Recording';
 
                         return (
                           <div
                             key={recording.id}
-                            className={`${statusColors.bg} hover:opacity-80 border ${statusColors.border} rounded p-2 transition-all cursor-pointer group`}
+                            className={`${statusColors.bg} hover:opacity-80 border ${isRecording ? 'border-red-500 ring-2 ring-red-500/50 animate-pulse' : statusColors.border} rounded p-2 transition-all cursor-pointer group relative`}
                             title={`${recording.eventTitle}\n${formatTime(recording.scheduledStart)} - ${formatTime(recording.scheduledEnd)}\n${recording.channelName}`}
                           >
                             <div className="flex items-start gap-2">
@@ -447,14 +448,14 @@ export default function DvrSchedulePage() {
                 .map(([date, dateRecordings]) => (
                   <div key={date} className="bg-gradient-to-br from-gray-900 to-black border border-red-900/30 rounded-lg overflow-hidden">
                     <div className={`px-4 py-3 border-b flex items-center gap-2 ${
-                      isToday(new Date(date)) ? 'bg-red-950/40 border-red-900/40' : 'bg-gray-800/30 border-red-900/20'
+                      isToday(new Date(date)) ? 'bg-amber-950/40 border-amber-900/40' : 'bg-gray-800/30 border-red-900/20'
                     }`}>
-                      <CalendarDaysIcon className="w-5 h-5 text-red-400" />
-                      <span className={`font-semibold ${isToday(new Date(date)) ? 'text-red-400' : 'text-white'}`}>
+                      <CalendarDaysIcon className={`w-5 h-5 ${isToday(new Date(date)) ? 'text-amber-400' : 'text-red-400'}`} />
+                      <span className={`font-semibold ${isToday(new Date(date)) ? 'text-amber-400' : 'text-white'}`}>
                         {formatDate(date)}
                       </span>
                       {isToday(new Date(date)) && (
-                        <span className="px-2 py-0.5 text-xs bg-red-600 text-white rounded">Today</span>
+                        <span className="px-2 py-0.5 text-xs bg-amber-600 text-white rounded">Today</span>
                       )}
                       <span className="text-gray-500 text-sm">({dateRecordings.length} recording{dateRecordings.length !== 1 ? 's' : ''})</span>
                     </div>
@@ -513,7 +514,7 @@ export default function DvrSchedulePage() {
           <h3 className="text-sm font-semibold text-gray-400 mb-3">Legend</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="flex items-center gap-2 text-sm text-gray-400">
-              <div className="w-3 h-3 bg-red-600 rounded"></div>
+              <div className="w-3 h-3 bg-amber-500 rounded"></div>
               <span>Today</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-400">
@@ -521,7 +522,7 @@ export default function DvrSchedulePage() {
               <span>Scheduled</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-400">
-              <div className="w-3 h-3 bg-red-600 rounded animate-pulse"></div>
+              <div className="w-3 h-3 bg-red-600 rounded ring-2 ring-red-500/50 animate-pulse"></div>
               <span>Recording</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-400">
