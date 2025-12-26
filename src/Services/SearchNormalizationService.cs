@@ -22,7 +22,7 @@ public static class SearchNormalizationService
         { "Mexico City", new[] { "Mexico" } },
         { "Sao Paulo", new[] { "Brazil", "Brazilian", "Interlagos" } },
         { "Las Vegas", new[] { "Vegas" } },
-        { "Abu Dhabi", new[] { "AbuDhabi", "Yas Marina" } },
+        { "Abu Dhabi", new[] { "AbuDhabi", "Yas Marina", "Fight Island", "UFC Fight Island" } },
         { "Monte Carlo", new[] { "Monaco" } },
         { "Spielberg", new[] { "Austria", "Austrian" } },
         { "Silverstone", new[] { "British", "Britain", "UK" } },
@@ -55,7 +55,6 @@ public static class SearchNormalizationService
         { "Circuit of the Americas", new[] { "COTA", "Austin", "Texas" } },
 
         // UFC / MMA Fight Night locations
-        { "Abu Dhabi", new[] { "Fight Island", "UFC Fight Island" } },
         { "Riyadh", new[] { "Saudi Arabia", "Saudi" } },
 
         // Common city variations
