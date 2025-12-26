@@ -7265,6 +7265,9 @@ app.MapGet("/api/dvr/stats", async (SportarrDbContext db) =>
 // Get all recordings with optional filtering
 app.MapGet("/api/dvr/recordings", async (
     Sportarr.Api.Services.DvrRecordingService dvrService,
+    Sportarr.Api.Services.DvrQualityScoreCalculator scoreCalculator,
+    Sportarr.Api.Services.ConfigService configService,
+    SportarrDbContext db,
     DvrRecordingStatus? status,
     int? eventId,
     int? channelId,
@@ -7273,7 +7276,55 @@ app.MapGet("/api/dvr/recordings", async (
     int? limit) =>
 {
     var recordings = await dvrService.GetRecordingsAsync(status, eventId, channelId, fromDate, toDate, limit);
-    return Results.Ok(recordings.Select(DvrRecordingResponse.FromEntity));
+    var responses = recordings.Select(DvrRecordingResponse.FromEntity).ToList();
+
+    // For scheduled recordings, calculate expected scores based on DVR encoding settings in config
+    var scheduledResponses = responses.Where(r => r.Status == DvrRecordingStatus.Scheduled).ToList();
+    if (scheduledResponses.Any())
+    {
+        try
+        {
+            var config = await configService.GetConfigAsync();
+
+            // Build a virtual DvrQualityProfile from config settings
+            var dvrProfile = new DvrQualityProfile
+            {
+                VideoCodec = config.DvrVideoCodec ?? "copy",
+                AudioCodec = config.DvrAudioCodec ?? "copy",
+                AudioChannels = config.DvrAudioChannels ?? "original",
+                AudioBitrate = config.DvrAudioBitrate,
+                VideoBitrate = config.DvrVideoBitrate,
+                Container = config.DvrContainer ?? "mp4",
+                Resolution = "original",
+                FrameRate = "original"
+            };
+
+            // Get the user's default quality profile for scoring
+            var defaultQualityProfile = await db.QualityProfiles.FirstOrDefaultAsync(p => p.IsDefault)
+                ?? await db.QualityProfiles.FirstOrDefaultAsync();
+            var qualityProfileId = defaultQualityProfile?.Id;
+
+            var estimate = await scoreCalculator.CalculateEstimatedScoresAsync(dvrProfile, qualityProfileId);
+
+            foreach (var response in scheduledResponses)
+            {
+                response.ExpectedQualityScore = estimate.QualityScore;
+                response.ExpectedCustomFormatScore = estimate.CustomFormatScore;
+                response.ExpectedTotalScore = estimate.TotalScore;
+                response.ExpectedQualityName = estimate.QualityName;
+                response.ExpectedFormatDescription = estimate.FormatDescription;
+                response.ExpectedMatchedFormats = estimate.MatchedFormats;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail the request - expected scores are informational
+            var logger = app.Services.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning(ex, "[DVR] Failed to calculate expected scores for scheduled recordings");
+        }
+    }
+
+    return Results.Ok(responses);
 });
 
 // Get a single recording
@@ -7449,99 +7500,8 @@ app.MapPost("/api/dvr/import-completed", async (Sportarr.Api.Services.EventDvrSe
 // ============================================================================
 // DVR Quality Profile Endpoints
 // ============================================================================
-
-// Get all DVR quality profiles
-app.MapGet("/api/dvr/profiles", async (SportarrDbContext db) =>
-{
-    var profiles = await db.DvrQualityProfiles.OrderBy(p => p.Id).ToListAsync();
-
-    // If no profiles exist, create defaults
-    if (profiles.Count == 0)
-    {
-        var defaults = Sportarr.Api.Services.FFmpegRecorderService.GetDefaultProfiles();
-        db.DvrQualityProfiles.AddRange(defaults);
-        await db.SaveChangesAsync();
-        profiles = defaults;
-    }
-
-    return Results.Ok(profiles);
-});
-
-// Get a specific DVR quality profile
-app.MapGet("/api/dvr/profiles/{id:int}", async (int id, SportarrDbContext db) =>
-{
-    var profile = await db.DvrQualityProfiles.FindAsync(id);
-    if (profile == null)
-        return Results.NotFound(new { error = "Profile not found" });
-    return Results.Ok(profile);
-});
-
-// Create a new DVR quality profile
-app.MapPost("/api/dvr/profiles", async (DvrQualityProfile profile, SportarrDbContext db, Sportarr.Api.Services.DvrQualityScoreCalculator scoreCalculator) =>
-{
-    profile.Id = 0; // Let DB assign ID
-    profile.Created = DateTime.UtcNow;
-    profile.IsDefault = false; // User profiles are not defaults
-
-    // Calculate estimated scores based on settings
-    scoreCalculator.UpdateProfileScores(profile);
-
-    db.DvrQualityProfiles.Add(profile);
-    await db.SaveChangesAsync();
-
-    return Results.Created($"/api/dvr/profiles/{profile.Id}", profile);
-});
-
-// Update a DVR quality profile
-app.MapPut("/api/dvr/profiles/{id:int}", async (int id, DvrQualityProfile updated, SportarrDbContext db, Sportarr.Api.Services.DvrQualityScoreCalculator scoreCalculator) =>
-{
-    var profile = await db.DvrQualityProfiles.FindAsync(id);
-    if (profile == null)
-        return Results.NotFound(new { error = "Profile not found" });
-
-    // Update fields
-    profile.Name = updated.Name;
-    profile.Preset = updated.Preset;
-    profile.VideoCodec = updated.VideoCodec;
-    profile.AudioCodec = updated.AudioCodec;
-    profile.VideoBitrate = updated.VideoBitrate;
-    profile.AudioBitrate = updated.AudioBitrate;
-    profile.Resolution = updated.Resolution;
-    profile.FrameRate = updated.FrameRate;
-    profile.HardwareAcceleration = updated.HardwareAcceleration;
-    profile.EncodingPreset = updated.EncodingPreset;
-    profile.ConstantRateFactor = updated.ConstantRateFactor;
-    profile.Container = updated.Container;
-    profile.CustomArguments = updated.CustomArguments;
-    profile.AudioChannels = updated.AudioChannels;
-    profile.AudioSampleRate = updated.AudioSampleRate;
-    profile.Deinterlace = updated.Deinterlace;
-    profile.EstimatedSizePerHourMb = updated.EstimatedSizePerHourMb;
-    profile.Modified = DateTime.UtcNow;
-
-    // Recalculate estimated scores based on new settings
-    scoreCalculator.UpdateProfileScores(profile);
-
-    await db.SaveChangesAsync();
-
-    return Results.Ok(profile);
-});
-
-// Delete a DVR quality profile
-app.MapDelete("/api/dvr/profiles/{id:int}", async (int id, SportarrDbContext db) =>
-{
-    var profile = await db.DvrQualityProfiles.FindAsync(id);
-    if (profile == null)
-        return Results.NotFound(new { error = "Profile not found" });
-
-    if (profile.IsDefault)
-        return Results.BadRequest(new { error = "Cannot delete default profiles" });
-
-    db.DvrQualityProfiles.Remove(profile);
-    await db.SaveChangesAsync();
-
-    return Results.Ok(new { success = true });
-});
+// Note: DVR encoding settings are now stored directly in config (DvrVideoCodec, DvrAudioCodec, etc.)
+// The DvrQualityProfile table is no longer used for settings - only for score calculation API
 
 // Detect available hardware acceleration methods
 app.MapGet("/api/dvr/hardware-acceleration", async (Sportarr.Api.Services.FFmpegRecorderService ffmpegService) =>
@@ -7676,7 +7636,14 @@ app.MapGet("/api/dvr/settings", async (Sportarr.Api.Services.ConfigService confi
         ffmpegPath = config.DvrFfmpegPath,
         enableReconnect = config.DvrEnableReconnect,
         maxReconnectAttempts = config.DvrMaxReconnectAttempts,
-        reconnectDelaySeconds = config.DvrReconnectDelaySeconds
+        reconnectDelaySeconds = config.DvrReconnectDelaySeconds,
+        // Encoding settings (direct config, not profile-based)
+        videoCodec = config.DvrVideoCodec,
+        audioCodec = config.DvrAudioCodec,
+        audioChannels = config.DvrAudioChannels,
+        audioBitrate = config.DvrAudioBitrate,
+        videoBitrate = config.DvrVideoBitrate,
+        container = config.DvrContainer
     });
 });
 
@@ -7715,6 +7682,20 @@ app.MapPut("/api/dvr/settings", async (HttpRequest request, Sportarr.Api.Service
         config.DvrMaxReconnectAttempts = maxReconnect.GetInt32();
     if (settings.TryGetProperty("reconnectDelaySeconds", out var reconnectDelay))
         config.DvrReconnectDelaySeconds = reconnectDelay.GetInt32();
+
+    // Encoding settings (direct config, not profile-based)
+    if (settings.TryGetProperty("videoCodec", out var videoCodec))
+        config.DvrVideoCodec = videoCodec.GetString() ?? "copy";
+    if (settings.TryGetProperty("audioCodec", out var audioCodec))
+        config.DvrAudioCodec = audioCodec.GetString() ?? "copy";
+    if (settings.TryGetProperty("audioChannels", out var audioChannels))
+        config.DvrAudioChannels = audioChannels.GetString() ?? "original";
+    if (settings.TryGetProperty("audioBitrate", out var audioBitrate))
+        config.DvrAudioBitrate = audioBitrate.GetInt32();
+    if (settings.TryGetProperty("videoBitrate", out var videoBitrate))
+        config.DvrVideoBitrate = videoBitrate.GetInt32();
+    if (settings.TryGetProperty("container", out var container))
+        config.DvrContainer = container.GetString() ?? "mp4";
 
     await configService.SaveConfigAsync(config);
 

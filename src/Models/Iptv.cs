@@ -920,6 +920,14 @@ public class DvrRecordingResponse
     public int? AudioChannels { get; set; }
     public DateTime Created { get; set; }
 
+    // Expected scores for scheduled recordings (based on DVR profile settings)
+    public int? ExpectedQualityScore { get; set; }
+    public int? ExpectedCustomFormatScore { get; set; }
+    public int? ExpectedTotalScore { get; set; }
+    public string? ExpectedQualityName { get; set; }
+    public string? ExpectedFormatDescription { get; set; }
+    public List<string>? ExpectedMatchedFormats { get; set; }
+
     public static DvrRecordingResponse FromEntity(DvrRecording recording)
     {
         return new DvrRecordingResponse

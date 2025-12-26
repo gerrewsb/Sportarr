@@ -123,7 +123,7 @@ public class Config
     public int RssReleaseAgeLimit { get; set; } = 14; // days - only consider releases posted within this window (sports releases are time-sensitive)
 
     // DVR Settings
-    public int DvrDefaultProfileId { get; set; } = 1; // Default quality profile ID (1 = Copy/No Transcoding)
+    public int DvrDefaultProfileId { get; set; } = 1; // Default quality profile ID (1 = Copy/No Transcoding) - DEPRECATED, use encoding settings below
     public string DvrRecordingPath { get; set; } = ""; // Root path for DVR recordings (empty = use root folder)
     public string DvrFileNamingPattern { get; set; } = "{Title} - {Date}"; // File naming pattern
     public int DvrPrePaddingMinutes { get; set; } = 5; // Minutes to start recording before scheduled event
@@ -136,4 +136,12 @@ public class Config
     public bool DvrEnableReconnect { get; set; } = true; // Enable stream reconnection on failures
     public int DvrMaxReconnectAttempts { get; set; } = 5; // Maximum reconnection attempts
     public int DvrReconnectDelaySeconds { get; set; } = 5; // Delay between reconnection attempts
+
+    // DVR Encoding Settings (direct settings instead of profile-based)
+    public string DvrVideoCodec { get; set; } = "copy"; // Video codec (copy, h264, hevc, av1, etc.)
+    public string DvrAudioCodec { get; set; } = "copy"; // Audio codec (copy, aac, ac3, eac3)
+    public string DvrAudioChannels { get; set; } = "original"; // Audio channels (original, stereo, 5.1)
+    public int DvrAudioBitrate { get; set; } = 192; // Audio bitrate in kbps (0 = auto)
+    public int DvrVideoBitrate { get; set; } = 0; // Video bitrate in kbps (0 = auto/VBR, only used when not copy)
+    public string DvrContainer { get; set; } = "mp4"; // Output container format (mp4, mkv, ts)
 }

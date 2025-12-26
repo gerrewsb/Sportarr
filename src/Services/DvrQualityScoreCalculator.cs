@@ -84,10 +84,8 @@ public class DvrQualityScoreCalculator
                 _logger.LogDebug("[DVR Score Calculator] Found quality profile: {Name} with {ItemCount} items and {FormatCount} format items",
                     qualityProfile.Name, qualityProfile.Items?.Count ?? 0, qualityProfile.FormatItems?.Count ?? 0);
 
-                // Get all custom formats with their specifications
-                customFormats = await _db.CustomFormats
-                    .Include(cf => cf.Specifications)
-                    .ToListAsync();
+                // Get all custom formats (Specifications is a JSON column, not a navigation property)
+                customFormats = await _db.CustomFormats.ToListAsync();
 
                 _logger.LogDebug("[DVR Score Calculator] Loaded {Count} custom formats", customFormats.Count);
             }

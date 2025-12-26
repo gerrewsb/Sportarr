@@ -45,7 +45,6 @@ public class FFmpegRecorderService
             }
 
             // Get FFmpeg path from config or use default
-            var config = await _configService.GetConfigAsync();
             var ffmpegPath = GetFFmpegPath();
 
             if (string.IsNullOrEmpty(ffmpegPath))
@@ -57,8 +56,8 @@ public class FFmpegRecorderService
                 };
             }
 
-            // Build FFmpeg arguments
-            var arguments = BuildFFmpegArguments(streamUrl, outputPath, userAgent);
+            // Build FFmpeg arguments using config settings
+            var arguments = await BuildFFmpegArgumentsFromConfigAsync(streamUrl, outputPath, userAgent);
 
             _logger.LogDebug("[DVR] FFmpeg command: {FFmpegPath} {Arguments}", ffmpegPath, arguments);
 
@@ -344,9 +343,168 @@ public class FFmpegRecorderService
         return null;
     }
 
+    private async Task<string> BuildFFmpegArgumentsFromConfigAsync(string streamUrl, string outputPath, string? userAgent)
+    {
+        var config = await _configService.GetConfigAsync();
+
+        var args = new List<string>();
+
+        // Input options
+        args.Add("-y");  // Overwrite output
+        args.Add("-hide_banner");
+        args.Add("-loglevel warning");
+
+        // Hardware acceleration input (for decoding)
+        var hwAccel = (HardwareAcceleration)config.DvrHardwareAcceleration;
+        if (hwAccel != HardwareAcceleration.None && hwAccel != HardwareAcceleration.Auto)
+        {
+            var hwAccelInput = GetHardwareAccelerationInputArgs(hwAccel);
+            if (!string.IsNullOrEmpty(hwAccelInput))
+            {
+                args.Add(hwAccelInput);
+            }
+        }
+
+        // User agent if provided
+        if (!string.IsNullOrEmpty(userAgent))
+        {
+            args.Add($"-user_agent \"{userAgent}\"");
+        }
+        else
+        {
+            // Default to VLC user agent (widely accepted)
+            args.Add("-user_agent \"VLC/3.0.18 LibVLC/3.0.18\"");
+        }
+
+        // Connection options for streams
+        args.Add("-reconnect 1");
+        args.Add("-reconnect_streamed 1");
+        args.Add("-reconnect_delay_max 5");
+
+        // Input
+        args.Add($"-i \"{streamUrl}\"");
+
+        // Video encoding based on config
+        var videoCodec = config.DvrVideoCodec?.ToLower() ?? "copy";
+        if (videoCodec == "copy")
+        {
+            args.Add("-c:v copy");
+        }
+        else
+        {
+            // Use the video codec specified in config (supports hardware encoders like h264_nvenc, hevc_nvenc, etc.)
+            var encoder = GetVideoEncoderFromCodecString(videoCodec, hwAccel);
+            args.Add($"-c:v {encoder}");
+
+            // Video bitrate if specified
+            if (config.DvrVideoBitrate > 0)
+            {
+                args.Add($"-b:v {config.DvrVideoBitrate}k");
+                args.Add($"-maxrate {(int)(config.DvrVideoBitrate * 1.5)}k");
+                args.Add($"-bufsize {config.DvrVideoBitrate * 2}k");
+            }
+        }
+
+        // Audio encoding based on config
+        var audioCodec = config.DvrAudioCodec?.ToLower() ?? "copy";
+        if (audioCodec == "copy")
+        {
+            args.Add("-c:a copy");
+        }
+        else
+        {
+            args.Add($"-c:a {audioCodec}");
+
+            // Audio bitrate
+            if (config.DvrAudioBitrate > 0)
+            {
+                args.Add($"-b:a {config.DvrAudioBitrate}k");
+            }
+            else
+            {
+                args.Add("-b:a 192k");
+            }
+
+            // Audio channels
+            var audioChannels = config.DvrAudioChannels?.ToLower() ?? "original";
+            switch (audioChannels)
+            {
+                case "stereo":
+                    args.Add("-ac 2");
+                    break;
+                case "5.1":
+                    args.Add("-ac 6");
+                    break;
+            }
+        }
+
+        // Container format based on output extension
+        var extension = Path.GetExtension(outputPath).ToLowerInvariant();
+        switch (extension)
+        {
+            case ".mp4":
+                args.Add("-movflags +faststart");
+                break;
+            case ".mkv":
+            case ".ts":
+                // No additional flags needed
+                break;
+        }
+
+        // Output file
+        args.Add($"\"{outputPath}\"");
+
+        return string.Join(" ", args);
+    }
+
+    /// <summary>
+    /// Get video encoder name from codec string, handling hardware variants
+    /// </summary>
+    private string GetVideoEncoderFromCodecString(string codec, HardwareAcceleration hwAccel)
+    {
+        // If the codec already specifies the encoder (e.g., h264_nvenc), use it directly
+        if (codec.Contains("_"))
+        {
+            return codec;
+        }
+
+        // Map simple codec names to FFmpeg encoder names
+        return codec switch
+        {
+            "h264" or "avc" => hwAccel switch
+            {
+                HardwareAcceleration.Nvenc => "h264_nvenc",
+                HardwareAcceleration.QuickSync => "h264_qsv",
+                HardwareAcceleration.Amf => "h264_amf",
+                HardwareAcceleration.Vaapi => "h264_vaapi",
+                HardwareAcceleration.VideoToolbox => "h264_videotoolbox",
+                _ => "libx264"
+            },
+            "hevc" or "h265" => hwAccel switch
+            {
+                HardwareAcceleration.Nvenc => "hevc_nvenc",
+                HardwareAcceleration.QuickSync => "hevc_qsv",
+                HardwareAcceleration.Amf => "hevc_amf",
+                HardwareAcceleration.Vaapi => "hevc_vaapi",
+                HardwareAcceleration.VideoToolbox => "hevc_videotoolbox",
+                _ => "libx265"
+            },
+            "av1" => hwAccel switch
+            {
+                HardwareAcceleration.Nvenc => "av1_nvenc",
+                HardwareAcceleration.QuickSync => "av1_qsv",
+                _ => "libsvtav1"
+            },
+            "vp9" => "libvpx-vp9",
+            "mpeg2" => "mpeg2video",
+            "vvc" => "libvvenc",
+            _ => codec // Use as-is if not recognized
+        };
+    }
+
     private string BuildFFmpegArguments(string streamUrl, string outputPath, string? userAgent)
     {
-        // Default to stream copy (no transcoding)
+        // Default to stream copy (no transcoding) - legacy method for backwards compatibility
         return BuildFFmpegArguments(streamUrl, outputPath, userAgent, null);
     }
 
@@ -823,95 +981,8 @@ public class FFmpegRecorderService
         }
     }
 
-    /// <summary>
-    /// Create default quality profiles.
-    /// Scores are calculated dynamically using DvrQualityScoreCalculator based on user's quality profile.
-    /// </summary>
-    public static List<DvrQualityProfile> GetDefaultProfiles()
-    {
-        return new List<DvrQualityProfile>
-        {
-            new DvrQualityProfile
-            {
-                Id = 1,
-                Name = "Copy (No Transcoding)",
-                Preset = DvrQualityPreset.Copy,
-                VideoCodec = "copy",
-                AudioCodec = "copy",
-                Container = "ts",
-                IsDefault = true,
-                EstimatedSizePerHourMb = 0, // Varies based on source
-                // Scores calculated dynamically by DvrQualityScoreCalculator
-                EstimatedQualityScore = 0,
-                EstimatedCustomFormatScore = 0,
-                ExpectedQualityName = "HDTV-1080p",
-                ExpectedFormatDescription = "Original (stream copy)"
-            },
-            new DvrQualityProfile
-            {
-                Id = 2,
-                Name = "High Quality",
-                Preset = DvrQualityPreset.High,
-                VideoCodec = "h264",
-                AudioCodec = "aac",
-                VideoBitrate = 8000,
-                AudioBitrate = 192,
-                Resolution = "original",
-                FrameRate = "original",
-                EncodingPreset = "fast",
-                Container = "mp4",
-                IsDefault = true,
-                EstimatedSizePerHourMb = 3500,
-                // Scores calculated dynamically by DvrQualityScoreCalculator
-                EstimatedQualityScore = 0,
-                EstimatedCustomFormatScore = 0,
-                ExpectedQualityName = "HDTV-1080p",
-                ExpectedFormatDescription = "H.264, AAC"
-            },
-            new DvrQualityProfile
-            {
-                Id = 3,
-                Name = "Medium Quality",
-                Preset = DvrQualityPreset.Medium,
-                VideoCodec = "h264",
-                AudioCodec = "aac",
-                VideoBitrate = 5000,
-                AudioBitrate = 128,
-                Resolution = "1080p",
-                FrameRate = "original",
-                EncodingPreset = "fast",
-                Container = "mp4",
-                IsDefault = true,
-                EstimatedSizePerHourMb = 2250,
-                // Scores calculated dynamically by DvrQualityScoreCalculator
-                EstimatedQualityScore = 0,
-                EstimatedCustomFormatScore = 0,
-                ExpectedQualityName = "HDTV-1080p",
-                ExpectedFormatDescription = "H.264, 1080p, AAC"
-            },
-            new DvrQualityProfile
-            {
-                Id = 4,
-                Name = "Low Quality",
-                Preset = DvrQualityPreset.Low,
-                VideoCodec = "h264",
-                AudioCodec = "aac",
-                VideoBitrate = 2500,
-                AudioBitrate = 96,
-                Resolution = "720p",
-                FrameRate = "original",
-                EncodingPreset = "fast",
-                Container = "mp4",
-                IsDefault = true,
-                EstimatedSizePerHourMb = 1125,
-                // Scores calculated dynamically by DvrQualityScoreCalculator
-                EstimatedQualityScore = 0,
-                EstimatedCustomFormatScore = 0,
-                ExpectedQualityName = "HDTV-720p",
-                ExpectedFormatDescription = "H.264, 720p, AAC"
-            }
-        };
-    }
+    // Note: Default profile presets (Copy/High/Medium/Low) have been removed.
+    // DVR encoding settings are now stored directly in config (DvrVideoCodec, DvrAudioCodec, etc.)
 
     private async Task MonitorRecordingAsync(RecordingProcess recording, CancellationToken cancellationToken)
     {

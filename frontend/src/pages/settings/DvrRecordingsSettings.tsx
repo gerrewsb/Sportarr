@@ -67,6 +67,20 @@ interface DvrRecording {
   postPadding: number;
   errorMessage?: string;
   createdAt: string;
+  // Actual scores (for completed recordings)
+  qualityScore?: number;
+  customFormatScore?: number;
+  quality?: string;
+  resolution?: string;
+  videoCodec?: string;
+  audioCodec?: string;
+  // Expected scores (for scheduled recordings)
+  expectedQualityScore?: number;
+  expectedCustomFormatScore?: number;
+  expectedTotalScore?: number;
+  expectedQualityName?: string;
+  expectedFormatDescription?: string;
+  expectedMatchedFormats?: string[];
 }
 
 interface DvrStats {
@@ -109,6 +123,13 @@ interface DvrSettings {
   enableReconnect: boolean;
   maxReconnectAttempts: number;
   reconnectDelaySeconds: number;
+  // Encoding settings (stored directly in config)
+  videoCodec: string;
+  audioCodec: string;
+  audioChannels: string;
+  audioBitrate: number;
+  videoBitrate: number;
+  container: string;
 }
 
 interface DvrQualityProfile {
@@ -175,6 +196,13 @@ const defaultDvrSettings: DvrSettings = {
   enableReconnect: true,
   maxReconnectAttempts: 5,
   reconnectDelaySeconds: 5,
+  // Encoding settings
+  videoCodec: 'copy',
+  audioCodec: 'copy',
+  audioChannels: 'original',
+  audioBitrate: 192,
+  videoBitrate: 0,
+  container: 'mp4',
 };
 
 const defaultFormData: ScheduleFormData = {
@@ -328,6 +356,19 @@ export default function DvrRecordingsSettings() {
       setDvrSettings(data);
       setOriginalSettings(data);
       setSettingsHasChanges(false);
+      // Sync encoding settings from config to the inline editor
+      setCurrentEncodingSettings({
+        videoCodec: data.videoCodec || 'copy',
+        audioCodec: data.audioCodec || 'copy',
+        audioChannels: data.audioChannels || 'original',
+        audioBitrate: data.audioBitrate || 192,
+        videoBitrate: data.videoBitrate || 0,
+        container: data.container || 'mp4',
+      });
+      // Also update GB per hour slider based on video bitrate
+      if (data.videoBitrate > 0) {
+        setGbPerHour(kbpsToGbPerHour(data.videoBitrate));
+      }
     } catch (err: any) {
       console.error('Failed to load DVR settings:', err);
     }
@@ -394,10 +435,12 @@ export default function DvrRecordingsSettings() {
   };
 
 
-  // Handle encoding setting change (for inline settings, not modal)
+  // Handle encoding setting change (for inline settings)
   const handleEncodingSettingChange = (field: string, value: any) => {
     const updated = { ...currentEncodingSettings, [field]: value };
     setCurrentEncodingSettings(updated);
+    // Also update dvrSettings so it gets saved
+    setDvrSettings(prev => ({ ...prev, [field]: value }));
     setSettingsHasChanges(true);
     // Update score preview
     loadScorePreviewForSettings(selectedQualityProfileId, updated);
@@ -409,6 +452,8 @@ export default function DvrRecordingsSettings() {
     const videoBitrate = gbPerHourToKbps(value);
     const updated = { ...currentEncodingSettings, videoBitrate };
     setCurrentEncodingSettings(updated);
+    // Also update dvrSettings so it gets saved
+    setDvrSettings(prev => ({ ...prev, videoBitrate }));
     setSettingsHasChanges(true);
     loadScorePreviewForSettings(selectedQualityProfileId, updated);
   };
@@ -817,7 +862,7 @@ export default function DvrRecordingsSettings() {
                 <li className="flex items-start">
                   <span className="text-red-400 mr-2">*</span>
                   <span>
-                    Recordings are saved as .ts (Transport Stream) files for best compatibility
+                    Recordings are saved using your chosen container format and encoding settings
                   </span>
                 </li>
               </ul>
@@ -1634,6 +1679,53 @@ export default function DvrRecordingsSettings() {
                           <p>
                             <span className="text-gray-500">File Size:</span>{' '}
                             <span className="text-white">{formatFileSize(recording.fileSize)}</span>
+                          </p>
+                        )}
+                        {/* Expected scores for scheduled recordings */}
+                        {recording.status === 'Scheduled' && recording.expectedQualityName && (
+                          <p>
+                            <span className="text-gray-500">Expected Quality:</span>{' '}
+                            <span className="text-amber-400">{recording.expectedQualityName}</span>
+                          </p>
+                        )}
+                        {recording.status === 'Scheduled' && recording.expectedTotalScore !== undefined && (
+                          <p>
+                            <span className="text-gray-500">Expected Score:</span>{' '}
+                            <span className={`font-semibold ${
+                              recording.expectedTotalScore >= 0 ? 'text-green-400' : 'text-red-400'
+                            }`}>
+                              {recording.expectedTotalScore >= 0 ? '+' : ''}{recording.expectedTotalScore}
+                            </span>
+                            <span className="text-gray-600 text-xs ml-1">
+                              (Q:{recording.expectedQualityScore ?? 0} + CF:{recording.expectedCustomFormatScore ?? 0})
+                            </span>
+                          </p>
+                        )}
+                        {recording.status === 'Scheduled' && recording.expectedMatchedFormats && recording.expectedMatchedFormats.length > 0 && (
+                          <p className="col-span-2">
+                            <span className="text-gray-500">Expected Formats:</span>{' '}
+                            <span className="text-blue-400 text-xs">{recording.expectedMatchedFormats.join(', ')}</span>
+                          </p>
+                        )}
+                        {/* Actual quality for completed/imported recordings */}
+                        {(recording.status === 'Completed' || recording.status === 'Imported') && recording.quality && (
+                          <p>
+                            <span className="text-gray-500">Quality:</span>{' '}
+                            <span className="text-green-400">{recording.quality}</span>
+                          </p>
+                        )}
+                        {(recording.status === 'Completed' || recording.status === 'Imported') && recording.qualityScore !== undefined && (
+                          <p>
+                            <span className="text-gray-500">Score:</span>{' '}
+                            <span className={`font-semibold ${
+                              (recording.qualityScore + (recording.customFormatScore ?? 0)) >= 0 ? 'text-green-400' : 'text-red-400'
+                            }`}>
+                              {(recording.qualityScore + (recording.customFormatScore ?? 0)) >= 0 ? '+' : ''}
+                              {recording.qualityScore + (recording.customFormatScore ?? 0)}
+                            </span>
+                            <span className="text-gray-600 text-xs ml-1">
+                              (Q:{recording.qualityScore} + CF:{recording.customFormatScore ?? 0})
+                            </span>
                           </p>
                         )}
                         {recording.errorMessage && (

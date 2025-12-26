@@ -510,13 +510,19 @@ public class DvrRecordingService
             Directory.CreateDirectory(folderPath);
         }
 
-        // Build filename
+        // Get container format directly from config
+        var container = config.DvrContainer ?? "mp4";
+
+        // Normalize container extension (ensure no leading dot)
+        container = container.TrimStart('.').ToLowerInvariant();
+
+        // Build filename with container format from profile
         var timestamp = recording.ScheduledStart.ToString("yyyy-MM-dd_HHmm");
         var partSuffix = !string.IsNullOrEmpty(recording.PartName)
             ? $" - {SanitizeFileName(recording.PartName)}"
             : "";
 
-        var filename = $"{eventTitle}{partSuffix} [{timestamp}].ts";
+        var filename = $"{eventTitle}{partSuffix} [{timestamp}].{container}";
 
         return Path.Combine(folderPath, filename);
     }
