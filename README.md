@@ -36,11 +36,7 @@ services:
     restart: unless-stopped
 ```
 
-**Important:** The default `PUID=99` and `PGID=100` match Unraid's default "nobody" user. If you need different permissions, override these values to match your user (run `id` to find your UID/GID).
-
 The `/config` volume stores your database and settings. The `/sports` volume is your media library root folder.
-
-**Note:** Unlike older versions, Sportarr does NOT require a `/downloads` volume mapping. Like Sonarr/Radarr, it gets download paths dynamically from your download client's API. If your download client and Sportarr see different paths (common in Docker), use **Remote Path Mappings** in Settings > Download Clients to translate between them.
 
 After starting the container, access the web UI at `http://your-server-ip:1867`.
 
