@@ -112,7 +112,7 @@ $env:Sportarr__DataPath = "C:\ProgramData\Sportarr"
 
 ## Supported Download Clients
 
-**Usenet:** SABnzbd, NZBGet
+**Usenet:** SABnzbd, NZBGet, NZBdav
 
 **Torrents:** qBittorrent, Transmission, Deluge, rTorrent, uTorrent
 
