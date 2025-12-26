@@ -217,6 +217,9 @@ export default function DvrRecordingsSettings() {
   const [userQualityProfiles, setUserQualityProfiles] = useState<QualityProfile[]>([]);
   const [selectedQualityProfileId, setSelectedQualityProfileId] = useState<number | null>(null);
 
+  // Source resolution for IPTV (what quality the source stream is)
+  const [sourceResolution, setSourceResolution] = useState<string>('1080p');
+
   // Load data on mount
   useEffect(() => {
     loadData();
@@ -339,14 +342,16 @@ export default function DvrRecordingsSettings() {
   };
 
   // Load score preview for current profile settings
-  const loadScorePreview = async (profile: DvrQualityProfile, qualityProfileId?: number | null) => {
+  const loadScorePreview = async (profile: DvrQualityProfile, qualityProfileId?: number | null, resolution?: string) => {
     try {
       setIsLoadingScorePreview(true);
-      // Pass the quality profile ID for accurate TRaSH-style scoring
+      // Pass the quality profile ID and source resolution for accurate scoring
       const profileIdToUse = qualityProfileId ?? selectedQualityProfileId;
-      const url = profileIdToUse
-        ? `/dvr/profiles/calculate-scores?qualityProfileId=${profileIdToUse}`
-        : '/dvr/profiles/calculate-scores';
+      const resolutionToUse = resolution ?? sourceResolution;
+      const params = new URLSearchParams();
+      if (profileIdToUse) params.append('qualityProfileId', profileIdToUse.toString());
+      if (resolutionToUse) params.append('sourceResolution', resolutionToUse);
+      const url = params.toString() ? `/dvr/profiles/calculate-scores?${params}` : '/dvr/profiles/calculate-scores';
       const { data } = await apiClient.post<DvrQualityScorePreview>(url, profile);
       setScorePreview(data);
     } catch (err: any) {
@@ -885,36 +890,69 @@ export default function DvrRecordingsSettings() {
                         </button>
                       </div>
 
-                      {/* Quality Profile Selector - Required First */}
+                      {/* Quality Profile & Source Resolution - Required First */}
                       <div className="mb-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
-                        <label className="flex items-center gap-2 text-sm font-medium text-white mb-2">
-                          <ChartBarIcon className="w-5 h-5 text-yellow-400" />
-                          Quality Profile for Scoring
-                          <span className="text-red-400">*</span>
-                        </label>
-                        <select
-                          value={selectedQualityProfileId || ''}
-                          onChange={(e) => {
-                            const newId = e.target.value ? parseInt(e.target.value) : null;
-                            setSelectedQualityProfileId(newId);
-                            if (editingProfile) {
-                              loadScorePreview(editingProfile, newId);
-                            }
-                          }}
-                          className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-red-500"
-                        >
-                          <option value="">-- Select a Quality Profile --</option>
-                          {userQualityProfiles.map((profile) => (
-                            <option key={profile.id} value={profile.id}>
-                              {profile.name} {profile.isDefault ? '(Default)' : ''}
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-xs text-gray-400 mt-2">
-                          Select your quality profile to calculate custom format scores. The scores displayed will match the format scores you've configured in this profile.
-                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Quality Profile Selector */}
+                          <div>
+                            <label className="flex items-center gap-2 text-sm font-medium text-white mb-2">
+                              <ChartBarIcon className="w-5 h-5 text-yellow-400" />
+                              Quality Profile for Scoring
+                              <span className="text-red-400">*</span>
+                            </label>
+                            <select
+                              value={selectedQualityProfileId || ''}
+                              onChange={(e) => {
+                                const newId = e.target.value ? parseInt(e.target.value) : null;
+                                setSelectedQualityProfileId(newId);
+                                if (editingProfile) {
+                                  loadScorePreview(editingProfile, newId);
+                                }
+                              }}
+                              className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-red-500"
+                            >
+                              <option value="">-- Select a Quality Profile --</option>
+                              {userQualityProfiles.map((profile) => (
+                                <option key={profile.id} value={profile.id}>
+                                  {profile.name} {profile.isDefault ? '(Default)' : ''}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Scores will match your profile's custom format scores
+                            </p>
+                          </div>
+
+                          {/* Source Resolution Selector */}
+                          <div>
+                            <label className="flex items-center gap-2 text-sm font-medium text-white mb-2">
+                              <VideoCameraIcon className="w-5 h-5 text-blue-400" />
+                              IPTV Source Resolution
+                            </label>
+                            <select
+                              value={sourceResolution}
+                              onChange={(e) => {
+                                setSourceResolution(e.target.value);
+                                if (editingProfile) {
+                                  loadScorePreview(editingProfile, selectedQualityProfileId, e.target.value);
+                                }
+                              }}
+                              className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-red-500"
+                            >
+                              <option value="2160p">4K / UHD (2160p)</option>
+                              <option value="1080p">Full HD (1080p)</option>
+                              <option value="720p">HD (720p)</option>
+                              <option value="576p">SD (576p)</option>
+                              <option value="480p">SD (480p)</option>
+                            </select>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Resolution of your IPTV source stream
+                            </p>
+                          </div>
+                        </div>
+
                         {!selectedQualityProfileId && (
-                          <p className="text-xs text-amber-400 mt-1">
+                          <p className="text-xs text-amber-400 mt-3">
                             ⚠️ Please select a quality profile to see accurate format scores for your encoding choices.
                           </p>
                         )}
