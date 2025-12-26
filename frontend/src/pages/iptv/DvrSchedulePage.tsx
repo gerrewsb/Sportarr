@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ClockIcon,
   PlayCircleIcon,
@@ -27,6 +28,7 @@ interface DvrRecording {
   eventTitle: string;
   channelId: number;
   channelName: string;
+  leagueId?: number;
   leagueName?: string;
   scheduledStart: string;
   scheduledEnd: string;
@@ -79,6 +81,7 @@ export default function DvrSchedulePage() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   const { timezone } = useTimezone();
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadData();
@@ -386,6 +389,7 @@ export default function DvrSchedulePage() {
                         return (
                           <div
                             key={recording.id}
+                            onClick={() => recording.leagueId && navigate(`/leagues/${recording.leagueId}`)}
                             className={`${statusColors.bg} hover:opacity-80 border ${isRecording ? 'border-red-500 ring-2 ring-red-500/50 animate-pulse' : statusColors.border} rounded p-2 transition-all cursor-pointer group relative`}
                             title={`${recording.eventTitle}\n${formatTime(recording.scheduledStart)} - ${formatTime(recording.scheduledEnd)}\n${recording.channelName}`}
                           >
@@ -467,7 +471,11 @@ export default function DvrSchedulePage() {
                       {dateRecordings.map(recording => {
                         const statusColors = getStatusColors(recording.status);
                         return (
-                          <div key={recording.id} className="p-4 hover:bg-gray-800/30 transition-colors">
+                          <div
+                            key={recording.id}
+                            onClick={() => recording.leagueId && navigate(`/leagues/${recording.leagueId}`)}
+                            className={`p-4 hover:bg-gray-800/30 transition-colors ${recording.leagueId ? 'cursor-pointer' : ''}`}
+                          >
                             <div className="flex items-start justify-between gap-4">
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-3 mb-1">

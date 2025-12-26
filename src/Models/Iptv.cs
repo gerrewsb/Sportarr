@@ -892,6 +892,7 @@ public class DvrRecordingResponse
     public int Id { get; set; }
     public int? EventId { get; set; }
     public string? EventTitle { get; set; }
+    public int? LeagueId { get; set; }
     public string? LeagueName { get; set; }
     public int ChannelId { get; set; }
     public string ChannelName { get; set; } = string.Empty;
@@ -925,6 +926,7 @@ public class DvrRecordingResponse
             Id = recording.Id,
             EventId = recording.EventId,
             EventTitle = recording.Event?.Title,
+            LeagueId = recording.Event?.LeagueId,
             LeagueName = recording.Event?.League?.Name,
             ChannelId = recording.ChannelId,
             ChannelName = recording.Channel?.Name ?? string.Empty,
