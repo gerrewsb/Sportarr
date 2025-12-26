@@ -230,8 +230,10 @@ jobs:
           if git diff --staged --quiet; then
             echo "No manifest changes to commit"
           else
-            git commit -m "chore: Update Jellyfin plugin manifest to ${{ steps.bump_version.outputs.version }} [skip ci]"
-            git push origin main
+            # Pull any changes that may have been pushed during the build
+            git pull --rebase origin main || true
+            git commit -m "chore: Update Jellyfin plugin manifest to ${{ steps.bump_version.outputs.version }} [skip ci]" || true
+            git push origin main || echo "Failed to push manifest update - this is non-fatal"
           fi
 
       - name: Set up QEMU
