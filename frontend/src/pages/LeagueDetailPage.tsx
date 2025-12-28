@@ -1,6 +1,6 @@
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeftIcon, MagnifyingGlassIcon, ChevronDownIcon, ChevronRightIcon, UserIcon, ArrowPathIcon, UsersIcon, TrashIcon, FilmIcon, FolderOpenIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, MagnifyingGlassIcon, ChevronDownIcon, ChevronRightIcon, UserIcon, ArrowPathIcon, UsersIcon, TrashIcon, FilmIcon, FolderOpenIcon, ExclamationTriangleIcon, SignalIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid';
 import { useState, useEffect, useRef } from 'react';
 import apiClient from '../api/client';
@@ -140,6 +140,19 @@ interface QualityProfile {
   name: string;
 }
 
+interface DvrChannel {
+  channel: {
+    id: number;
+    name: string;
+    logoUrl?: string;
+    status: string;
+    detectedQuality?: string;
+  };
+  quality: string;
+  qualityScore: number;
+  isPreferred: boolean;
+}
+
 export default function LeagueDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -221,6 +234,16 @@ export default function LeagueDetailPage() {
     },
   });
 
+  // Fetch DVR channels for this league
+  const { data: dvrChannels = [], isLoading: dvrChannelsLoading } = useQuery({
+    queryKey: ['dvr-channels', id],
+    queryFn: async () => {
+      const response = await apiClient.get<DvrChannel[]>(`/iptv/leagues/${id}/channels-by-quality`);
+      return response.data;
+    },
+    enabled: !!id,
+  });
+
   // Fetch search queue and download queue status for real-time progress display
   const { data: searchQueue } = useSearchQueueStatus();
   const { data: downloadQueue } = useDownloadQueue();
@@ -261,6 +284,21 @@ export default function LeagueDetailPage() {
     },
     onError: () => {
       toast.error('Failed to update quality profile');
+    },
+  });
+
+  // Set preferred DVR channel for this league
+  const setPreferredChannelMutation = useMutation({
+    mutationFn: async (channelId: number | null) => {
+      const response = await apiClient.post(`/iptv/leagues/${id}/preferred-channel`, { channelId });
+      return response.data;
+    },
+    onSuccess: async (data) => {
+      await queryClient.refetchQueries({ queryKey: ['dvr-channels', id] });
+      toast.success(data.message || 'Preferred channel updated');
+    },
+    onError: () => {
+      toast.error('Failed to update preferred channel');
     },
   });
 
@@ -943,6 +981,115 @@ export default function LeagueDetailPage() {
                   </label>
                 </div>
               </div>
+            </div>
+
+            {/* DVR Channel Preference */}
+            <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-red-900/30">
+              <div className="flex items-center justify-between mb-3 md:mb-4">
+                <div className="flex items-center gap-2">
+                  <VideoCameraIcon className="w-4 h-4 md:w-5 md:h-5 text-red-400" />
+                  <h3 className="text-xs md:text-sm font-semibold text-white">DVR Channel Preference</h3>
+                </div>
+                {dvrChannels.length > 0 && (
+                  <span className="text-xs text-gray-500">{dvrChannels.length} channel{dvrChannels.length !== 1 ? 's' : ''} available</span>
+                )}
+              </div>
+
+              {dvrChannelsLoading ? (
+                <div className="text-sm text-gray-400">Loading channels...</div>
+              ) : dvrChannels.length === 0 ? (
+                <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <SignalIcon className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-gray-400">No channels mapped to this league</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Go to Settings → IPTV Channels and map channels to this league, or use Auto-Map to automatically detect and map channels.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-400 mb-3">
+                    Select which channel to use for DVR recordings. By default, the highest quality channel is automatically selected.
+                  </p>
+
+                  {/* Auto-select option */}
+                  <button
+                    onClick={() => setPreferredChannelMutation.mutate(null)}
+                    disabled={setPreferredChannelMutation.isPending}
+                    className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                      !dvrChannels.some(c => c.isPreferred)
+                        ? 'bg-red-950/30 border-red-900/50 ring-1 ring-red-600'
+                        : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded bg-gray-800 flex items-center justify-center">
+                      <SignalIcon className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="text-sm font-medium text-white">Auto-select best quality</div>
+                      <div className="text-xs text-gray-500">Automatically choose the highest quality online channel</div>
+                    </div>
+                    {!dvrChannels.some(c => c.isPreferred) && (
+                      <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                    )}
+                  </button>
+
+                  {/* Channel list */}
+                  {dvrChannels.map((dvrChannel) => (
+                    <button
+                      key={dvrChannel.channel.id}
+                      onClick={() => setPreferredChannelMutation.mutate(dvrChannel.channel.id)}
+                      disabled={setPreferredChannelMutation.isPending}
+                      className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                        dvrChannel.isPreferred
+                          ? 'bg-red-950/30 border-red-900/50 ring-1 ring-red-600'
+                          : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
+                      }`}
+                    >
+                      {dvrChannel.channel.logoUrl ? (
+                        <img
+                          src={dvrChannel.channel.logoUrl}
+                          alt={dvrChannel.channel.name}
+                          className="w-8 h-8 rounded object-contain bg-gray-800"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded bg-gray-800 flex items-center justify-center">
+                          <SignalIcon className="w-4 h-4 text-gray-600" />
+                        </div>
+                      )}
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="text-sm font-medium text-white truncate">{dvrChannel.channel.name}</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className={`px-1.5 py-0.5 text-xs rounded ${
+                            dvrChannel.quality === '4K' ? 'bg-purple-900/30 text-purple-400' :
+                            dvrChannel.quality === 'FHD' ? 'bg-blue-900/30 text-blue-400' :
+                            dvrChannel.quality === 'HD' ? 'bg-green-900/30 text-green-400' :
+                            'bg-yellow-900/30 text-yellow-400'
+                          }`}>
+                            {dvrChannel.quality}
+                          </span>
+                          <span className={`px-1.5 py-0.5 text-xs rounded ${
+                            dvrChannel.channel.status === 'Online' ? 'bg-green-900/30 text-green-400' :
+                            dvrChannel.channel.status === 'Offline' ? 'bg-red-900/30 text-red-400' :
+                            'bg-gray-700 text-gray-400'
+                          }`}>
+                            {dvrChannel.channel.status}
+                          </span>
+                        </div>
+                      </div>
+                      {dvrChannel.isPreferred && (
+                        <CheckCircleIcon className="w-5 h-5 text-green-500 flex-shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

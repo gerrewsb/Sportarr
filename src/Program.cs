@@ -6468,15 +6468,79 @@ app.MapGet("/api/iptv/leagues/{leagueId:int}/best-channel", async (int leagueId,
 });
 
 // Get all channels for a league ordered by quality
-app.MapGet("/api/iptv/leagues/{leagueId:int}/channels-by-quality", async (int leagueId, Sportarr.Api.Services.ChannelAutoMappingService autoMappingService) =>
+app.MapGet("/api/iptv/leagues/{leagueId:int}/channels-by-quality", async (int leagueId, Sportarr.Api.Services.ChannelAutoMappingService autoMappingService, Sportarr.Api.Data.SportarrDbContext db) =>
 {
     var channels = await autoMappingService.GetChannelsForLeagueByQualityAsync(leagueId);
+
+    // Get the currently preferred channel mapping for this league
+    var preferredMapping = await db.ChannelLeagueMappings
+        .Where(m => m.LeagueId == leagueId && m.IsPreferred)
+        .FirstOrDefaultAsync();
+
     return Results.Ok(channels.Select(c => new
     {
         channel = IptvChannelResponse.FromEntity(c.Channel),
         quality = c.Quality.Label,
-        qualityScore = c.Quality.Score
+        qualityScore = c.Quality.Score,
+        isPreferred = preferredMapping?.ChannelId == c.Channel.Id
     }));
+});
+
+// Set preferred channel for a league (for DVR recording)
+app.MapPost("/api/iptv/leagues/{leagueId:int}/preferred-channel", async (int leagueId, HttpContext context, Sportarr.Api.Data.SportarrDbContext db, ILogger<Program> logger) =>
+{
+    try
+    {
+        var body = await context.Request.ReadFromJsonAsync<SetPreferredChannelRequest>();
+        if (body == null)
+            return Results.BadRequest(new { error = "Request body is required" });
+
+        // Get all channel mappings for this league
+        var mappings = await db.ChannelLeagueMappings
+            .Where(m => m.LeagueId == leagueId)
+            .ToListAsync();
+
+        if (mappings.Count == 0)
+            return Results.NotFound(new { error = "No channels are mapped to this league" });
+
+        // If channelId is null, clear the preferred channel (auto-select mode)
+        if (body.ChannelId == null)
+        {
+            foreach (var mapping in mappings)
+            {
+                mapping.IsPreferred = false;
+            }
+            await db.SaveChangesAsync();
+
+            logger.LogInformation("[IPTV] Cleared preferred channel for league {LeagueId} (auto-select mode)", leagueId);
+            return Results.Ok(new { success = true, message = "Cleared preferred channel - will auto-select best quality" });
+        }
+
+        // Check if the specified channel is mapped to this league
+        var targetMapping = mappings.FirstOrDefault(m => m.ChannelId == body.ChannelId);
+        if (targetMapping == null)
+            return Results.BadRequest(new { error = "Channel is not mapped to this league" });
+
+        // Set only the specified channel as preferred
+        foreach (var mapping in mappings)
+        {
+            mapping.IsPreferred = mapping.ChannelId == body.ChannelId;
+        }
+
+        await db.SaveChangesAsync();
+
+        // Get the channel name for logging
+        var channel = await db.IptvChannels.FirstOrDefaultAsync(c => c.Id == body.ChannelId);
+        logger.LogInformation("[IPTV] Set preferred channel for league {LeagueId}: {ChannelName} (ID: {ChannelId})",
+            leagueId, channel?.Name ?? "Unknown", body.ChannelId);
+
+        return Results.Ok(new { success = true, message = $"Set '{channel?.Name}' as preferred channel for DVR recordings" });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "[IPTV] Failed to set preferred channel for league {LeagueId}", leagueId);
+        return Results.BadRequest(new { success = false, error = ex.Message });
+    }
 });
 
 // Get detected networks for a channel
@@ -11690,6 +11754,7 @@ finally
 
 // Request/Response models
 public record UpdateSuggestionRequest(int? EventId, string? Part);
+public record SetPreferredChannelRequest(int? ChannelId);
 
 // Make Program class accessible to integration tests
 public partial class Program { }
