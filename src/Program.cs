@@ -3875,21 +3875,15 @@ app.MapPut("/api/settings", async (AppSettings updatedSettings, Sportarr.Api.Ser
     var previousEnableMultiPart = config.EnableMultiPartEpisodes;
 
     // Handle password hashing if needed
-    if (securitySettings != null)
+    // Only call SetCredentialsAsync when BOTH username AND password are provided (user is setting new credentials)
+    // If only username is provided (no password), it's just a settings save - credentials are managed via config.xml
+    if (securitySettings != null &&
+        !string.IsNullOrWhiteSpace(securitySettings.Username) &&
+        !string.IsNullOrWhiteSpace(securitySettings.Password))
     {
-        if (!string.IsNullOrWhiteSpace(securitySettings.Username) &&
-            !string.IsNullOrWhiteSpace(securitySettings.Password))
-        {
-            logger.LogInformation("[AUTH] Updating credentials for user: {Username}", securitySettings.Username);
-            await simpleAuthService.SetCredentialsAsync(securitySettings.Username, securitySettings.Password);
-            logger.LogInformation("[AUTH] Credentials updated successfully");
-        }
-        else if (!string.IsNullOrWhiteSpace(securitySettings.Username))
-        {
-            logger.LogInformation("[AUTH] Username-only update requested for: {Username}", securitySettings.Username);
-            await simpleAuthService.SetUsernameAsync(securitySettings.Username);
-            logger.LogInformation("[AUTH] Username updated successfully");
-        }
+        logger.LogInformation("[AUTH] Setting new credentials for user: {Username}", securitySettings.Username);
+        await simpleAuthService.SetCredentialsAsync(securitySettings.Username, securitySettings.Password);
+        logger.LogInformation("[AUTH] Credentials set successfully");
     }
 
     // Log incoming security settings for debugging
