@@ -54,16 +54,68 @@ LABEL org.opencontainers.image.title="Sportarr" \
 # Unraid/Docker Hub icon URL (points to GitHub raw content)
 LABEL net.unraid.docker.icon="https://raw.githubusercontent.com/Sportarr/Sportarr/main/Logo/512.png"
 
-# Install runtime dependencies including gosu for proper user switching and FFmpeg for stream transcoding
+# ============================================================================
+# Hardware Acceleration Drivers Installation
+# Supports: Intel QSV, AMD/Intel VAAPI, NVIDIA NVENC (host runtime required)
+# ============================================================================
+
+# Enable non-free and non-free-firmware repositories for Intel drivers
+# Required for intel-media-va-driver-non-free (HEVC encoding on 8th gen+)
+RUN sed -i 's/Components: main/Components: main contrib non-free non-free-firmware/' /etc/apt/sources.list.d/debian.sources
+
+# Install runtime dependencies including hardware acceleration drivers
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
+        # Core dependencies
         sqlite3 \
         curl \
         ca-certificates \
         gosu \
-        ffmpeg && \
+        # ========================================
+        # FFmpeg with hardware acceleration
+        # ========================================
+        ffmpeg \
+        # ========================================
+        # Intel Quick Sync Video (QSV)
+        # intel-media-va-driver-non-free: Modern driver for 8th gen+ (HEVC/AV1)
+        # i965-va-driver: Legacy driver for 6th/7th gen (H.264)
+        # libmfx1: Intel Media SDK runtime (QSV framework)
+        # ========================================
+        intel-media-va-driver-non-free \
+        i965-va-driver \
+        libmfx1 \
+        # ========================================
+        # VAAPI (Video Acceleration API)
+        # Works with Intel iGPU and AMD GPUs
+        # ========================================
+        libva2 \
+        libva-drm2 \
+        va-driver-all \
+        mesa-va-drivers \
+        # ========================================
+        # OpenCL support (Intel/AMD GPU compute)
+        # ========================================
+        intel-opencl-icd \
+        ocl-icd-libopencl1 \
+        # ========================================
+        # Debugging tools
+        # ========================================
+        vainfo && \
+    # Cleanup to reduce image size
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# ============================================================================
+# GPU Environment Configuration
+# ============================================================================
+# LIBVA_DRIVER_NAME: Selects the VA-API driver
+#   - iHD: Intel Media Driver (8th gen+, recommended)
+#   - i965: Intel i965 driver (legacy, 6th/7th gen)
+#   - radeonsi: AMD GPUs
+# LIBVA_DRIVERS_PATH: Path to VA-API driver libraries
+# ============================================================================
+ENV LIBVA_DRIVER_NAME=iHD \
+    LIBVA_DRIVERS_PATH=/usr/lib/x86_64-linux-gnu/dri
 
 # Copy application first (as root to ensure permissions)
 WORKDIR /app
