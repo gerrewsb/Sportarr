@@ -96,11 +96,59 @@ public class FFmpegRecorderService
                 _logger.LogError("[DVR] FFmpeg exited immediately with code {ExitCode}. Error: {Error}",
                     process.ExitCode, stderr);
 
-                return new RecordingResult
+                // Check if failure was due to hardware acceleration issues
+                if (stderr.Contains("Device creation failed") ||
+                    stderr.Contains("No device available for decoder") ||
+                    stderr.Contains("Error initializing an MFX session") ||
+                    stderr.Contains("Cannot load libcuda") ||
+                    stderr.Contains("hwaccel initialisation") ||
+                    stderr.Contains("device type") && stderr.Contains("needed for codec"))
                 {
-                    Success = false,
-                    Error = $"FFmpeg failed to start recording: {stderr}"
-                };
+                    _logger.LogWarning("[DVR] Hardware acceleration failed (QSV/NVENC/VAAPI not available in container), retrying with software encoding...");
+
+                    // Retry without hardware acceleration
+                    var softwareArguments = await BuildFFmpegArgumentsFromConfigAsync(streamUrl, outputPath, userAgent, forceNoHwAccel: true);
+                    _logger.LogInformation("[DVR] FFmpeg retry command (software): {FFmpegPath} {Arguments}", ffmpegPath, softwareArguments);
+
+                    var retryProcessInfo = new ProcessStartInfo
+                    {
+                        FileName = ffmpegPath,
+                        Arguments = softwareArguments,
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        RedirectStandardInput = true,
+                        CreateNoWindow = true
+                    };
+
+                    process = new Process { StartInfo = retryProcessInfo };
+                    process.Start();
+
+                    // Wait and check again
+                    await Task.Delay(2000, cancellationToken);
+
+                    if (process.HasExited)
+                    {
+                        var retryStderr = await process.StandardError.ReadToEndAsync();
+                        _logger.LogError("[DVR] FFmpeg software fallback also failed: {Error}", retryStderr);
+
+                        return new RecordingResult
+                        {
+                            Success = false,
+                            Error = $"Recording failed. Hardware acceleration unavailable in Docker (check /dev/dri permissions). Software fallback error: {retryStderr}"
+                        };
+                    }
+
+                    _logger.LogInformation("[DVR] Recording started successfully with software encoding (hardware acceleration unavailable)");
+                }
+                else
+                {
+                    return new RecordingResult
+                    {
+                        Success = false,
+                        Error = $"FFmpeg failed to start recording: {stderr}"
+                    };
+                }
             }
 
             // Check if output file is being written to (should have some data after 2 seconds)
@@ -427,7 +475,7 @@ public class FFmpegRecorderService
         return null;
     }
 
-    private async Task<string> BuildFFmpegArgumentsFromConfigAsync(string streamUrl, string outputPath, string? userAgent)
+    private async Task<string> BuildFFmpegArgumentsFromConfigAsync(string streamUrl, string outputPath, string? userAgent, bool forceNoHwAccel = false)
     {
         var config = await _configService.GetConfigAsync();
 
@@ -438,9 +486,15 @@ public class FFmpegRecorderService
         args.Add("-hide_banner");
         args.Add("-loglevel warning");
 
-        // Hardware acceleration input (for decoding)
-        var hwAccel = (HardwareAcceleration)config.DvrHardwareAcceleration;
-        if (hwAccel != HardwareAcceleration.None && hwAccel != HardwareAcceleration.Auto)
+        // Check if we're actually transcoding (not just copying)
+        var videoCodec = config.DvrVideoCodec?.ToLower() ?? "copy";
+        var isTranscoding = videoCodec != "copy";
+
+        // Hardware acceleration input (for decoding) - ONLY when transcoding
+        // When using -c:v copy, we don't need hardware decoding and it can cause failures
+        // if the hardware isn't properly configured in Docker
+        var hwAccel = forceNoHwAccel ? HardwareAcceleration.None : (HardwareAcceleration)config.DvrHardwareAcceleration;
+        if (isTranscoding && hwAccel != HardwareAcceleration.None && hwAccel != HardwareAcceleration.Auto)
         {
             var hwAccelInput = GetHardwareAccelerationInputArgs(hwAccel);
             if (!string.IsNullOrEmpty(hwAccelInput))
@@ -469,7 +523,6 @@ public class FFmpegRecorderService
         args.Add($"-i \"{streamUrl}\"");
 
         // Video encoding based on config
-        var videoCodec = config.DvrVideoCodec?.ToLower() ?? "copy";
         if (videoCodec == "copy")
         {
             args.Add("-c:v copy");
@@ -546,14 +599,26 @@ public class FFmpegRecorderService
     /// </summary>
     private string GetVideoEncoderFromCodecString(string codec, HardwareAcceleration hwAccel)
     {
-        // If the codec already specifies the encoder (e.g., h264_nvenc), use it directly
+        // If codec contains hardware suffix (e.g., hevc_qsv, h264_nvenc), extract base codec
+        // when hwAccel is None (software fallback mode)
+        var baseCodec = codec;
         if (codec.Contains("_"))
         {
-            return codec;
+            // Extract base codec from hardware encoder name
+            if (codec.Contains("_qsv") || codec.Contains("_nvenc") || codec.Contains("_amf") ||
+                codec.Contains("_vaapi") || codec.Contains("_videotoolbox"))
+            {
+                baseCodec = codec.Split('_')[0]; // e.g., "hevc_qsv" -> "hevc"
+            }
+            else if (hwAccel != HardwareAcceleration.None)
+            {
+                // Use as-is if it's a specific encoder and hw accel is enabled
+                return codec;
+            }
         }
 
-        // Map simple codec names to FFmpeg encoder names
-        return codec switch
+        // Map codec names to FFmpeg encoder names based on hardware acceleration
+        return baseCodec switch
         {
             "h264" or "avc" => hwAccel switch
             {
@@ -582,7 +647,7 @@ public class FFmpegRecorderService
             "vp9" => "libvpx-vp9",
             "mpeg2" => "mpeg2video",
             "vvc" => "libvvenc",
-            _ => codec // Use as-is if not recognized
+            _ => hwAccel == HardwareAcceleration.None ? "libx264" : codec // Default to libx264 for software fallback
         };
     }
 
