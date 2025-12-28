@@ -3,6 +3,21 @@ set -e
 
 echo "[Sportarr] Entrypoint starting..."
 
+# ============================================================================
+# Architecture Detection and VAAPI Path Configuration
+# ============================================================================
+ARCH=$(uname -m)
+echo "[Sportarr] Architecture: $ARCH"
+
+# Set LIBVA_DRIVERS_PATH based on architecture (Debian multiarch paths)
+if [ "$ARCH" = "x86_64" ]; then
+    export LIBVA_DRIVERS_PATH=/usr/lib/x86_64-linux-gnu/dri
+elif [ "$ARCH" = "aarch64" ]; then
+    export LIBVA_DRIVERS_PATH=/usr/lib/aarch64-linux-gnu/dri
+    # ARM doesn't have Intel QSV, use mesa driver
+    export LIBVA_DRIVER_NAME=
+fi
+
 # Handle PUID/PGID/UMASK for Unraid and Docker compatibility (matching Sonarr/Radarr defaults)
 PUID=${PUID:-99}
 PGID=${PGID:-100}

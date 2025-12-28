@@ -57,50 +57,50 @@ LABEL net.unraid.docker.icon="https://raw.githubusercontent.com/Sportarr/Sportar
 # ============================================================================
 # Hardware Acceleration Drivers Installation
 # Supports: Intel QSV, AMD/Intel VAAPI, NVIDIA NVENC (host runtime required)
+# Architecture-aware: Intel packages only installed on amd64 (x86_64)
 # ============================================================================
 
-# Enable non-free and non-free-firmware repositories for Intel drivers
+# Enable non-free and non-free-firmware repositories for Intel drivers (amd64 only)
 # Required for intel-media-va-driver-non-free (HEVC encoding on 8th gen+)
-RUN sed -i 's/Components: main/Components: main contrib non-free non-free-firmware/' /etc/apt/sources.list.d/debian.sources
+RUN if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
+        sed -i 's/Components: main/Components: main contrib non-free non-free-firmware/' /etc/apt/sources.list.d/debian.sources; \
+    fi
 
 # Install runtime dependencies including hardware acceleration drivers
+# Architecture-aware installation:
+# - amd64: Full Intel QSV + VAAPI + OpenCL support
+# - arm64: VAAPI only (no Intel-specific packages)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        # Core dependencies
+        # Core dependencies (all architectures)
         sqlite3 \
         curl \
         ca-certificates \
         gosu \
-        # ========================================
         # FFmpeg with hardware acceleration
-        # ========================================
         ffmpeg \
-        # ========================================
-        # Intel Quick Sync Video (QSV)
-        # intel-media-va-driver-non-free: Modern driver for 8th gen+ (HEVC/AV1)
-        # i965-va-driver: Legacy driver for 6th/7th gen (H.264)
-        # libmfx1: Intel Media SDK runtime (QSV framework)
-        # ========================================
-        intel-media-va-driver-non-free \
-        i965-va-driver \
-        libmfx1 \
-        # ========================================
-        # VAAPI (Video Acceleration API)
-        # Works with Intel iGPU and AMD GPUs
-        # ========================================
+        # VAAPI (Video Acceleration API) - works on all architectures
         libva2 \
         libva-drm2 \
         va-driver-all \
         mesa-va-drivers \
-        # ========================================
-        # OpenCL support (Intel/AMD GPU compute)
-        # ========================================
-        intel-opencl-icd \
-        ocl-icd-libopencl1 \
-        # ========================================
         # Debugging tools
-        # ========================================
         vainfo && \
+    # Intel-specific packages (amd64 only)
+    # These packages don't exist for arm64 architecture
+    if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
+        apt-get install -y --no-install-recommends \
+            # Intel Quick Sync Video (QSV)
+            # intel-media-va-driver-non-free: Modern driver for 8th gen+ (HEVC/AV1)
+            # i965-va-driver: Legacy driver for 6th/7th gen (H.264)
+            # libmfx1: Intel Media SDK runtime (QSV framework)
+            intel-media-va-driver-non-free \
+            i965-va-driver \
+            libmfx1 \
+            # OpenCL support (Intel GPU compute)
+            intel-opencl-icd \
+            ocl-icd-libopencl1; \
+    fi && \
     # Cleanup to reduce image size
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -109,13 +109,12 @@ RUN apt-get update && \
 # GPU Environment Configuration
 # ============================================================================
 # LIBVA_DRIVER_NAME: Selects the VA-API driver
-#   - iHD: Intel Media Driver (8th gen+, recommended)
+#   - iHD: Intel Media Driver (8th gen+, recommended for amd64)
 #   - i965: Intel i965 driver (legacy, 6th/7th gen)
 #   - radeonsi: AMD GPUs
-# LIBVA_DRIVERS_PATH: Path to VA-API driver libraries
+# LIBVA_DRIVERS_PATH: Set at runtime in entrypoint based on architecture
 # ============================================================================
-ENV LIBVA_DRIVER_NAME=iHD \
-    LIBVA_DRIVERS_PATH=/usr/lib/x86_64-linux-gnu/dri
+ENV LIBVA_DRIVER_NAME=iHD
 
 # Copy application first (as root to ensure permissions)
 WORKDIR /app
