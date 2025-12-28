@@ -89,6 +89,10 @@ export default function IptvChannelsSettings() {
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
   const [showGroupDropdown, setShowGroupDropdown] = useState(false);
 
+  // Available filter options loaded from API (all channels, not just loaded ones)
+  const [availableCountries, setAvailableCountries] = useState<string[]>([]);
+  const [availableGroups, setAvailableGroups] = useState<string[]>([]);
+
   // Selection state for bulk operations
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
@@ -111,6 +115,7 @@ export default function IptvChannelsSettings() {
   useEffect(() => {
     loadChannels(0, true);
     loadLeagues();
+    loadFilterOptions();
   }, []);
 
   // Reload when filters change
@@ -164,27 +169,21 @@ export default function IptvChannelsSettings() {
     }
   };
 
-  // Extract unique countries from all channels
-  const availableCountries = useMemo(() => {
-    const countries = new Set<string>();
-    channels.forEach((channel) => {
-      if (channel.country && channel.country.trim()) {
-        countries.add(channel.country.trim());
-      }
-    });
-    return Array.from(countries).sort();
-  }, [channels]);
-
-  // Extract unique groups from all channels
-  const availableGroups = useMemo(() => {
-    const groups = new Set<string>();
-    channels.forEach((channel) => {
-      if (channel.group && channel.group.trim()) {
-        groups.add(channel.group.trim());
-      }
-    });
-    return Array.from(groups).sort();
-  }, [channels]);
+  // Load all available filter options (countries and groups) from API
+  const loadFilterOptions = async () => {
+    try {
+      const [countriesRes, groupsRes] = await Promise.all([
+        apiClient.get<string[]>('/iptv/countries'),
+        apiClient.get<string[]>('/iptv/groups'),
+      ]);
+      setAvailableCountries(Array.isArray(countriesRes.data) ? countriesRes.data : []);
+      setAvailableGroups(Array.isArray(groupsRes.data) ? groupsRes.data : []);
+    } catch (err: any) {
+      console.error('Failed to load filter options:', err);
+      setAvailableCountries([]);
+      setAvailableGroups([]);
+    }
+  };
 
   // Filter channels client-side for instant feedback
   const filteredChannels = useMemo(() => {
