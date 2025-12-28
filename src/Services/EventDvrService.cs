@@ -17,6 +17,7 @@ public class EventDvrService
     private readonly ChannelAutoMappingService _autoMappingService;
     private readonly FFmpegRecorderService _ffmpegService;
     private readonly ReleaseEvaluator _releaseEvaluator;
+    private readonly EpgSchedulingService _epgSchedulingService;
 
     public EventDvrService(
         ILogger<EventDvrService> logger,
@@ -25,7 +26,8 @@ public class EventDvrService
         IptvSourceService iptvService,
         ChannelAutoMappingService autoMappingService,
         FFmpegRecorderService ffmpegService,
-        ReleaseEvaluator releaseEvaluator)
+        ReleaseEvaluator releaseEvaluator,
+        EpgSchedulingService epgSchedulingService)
     {
         _logger = logger;
         _db = db;
@@ -34,6 +36,7 @@ public class EventDvrService
         _autoMappingService = autoMappingService;
         _ffmpegService = ffmpegService;
         _releaseEvaluator = releaseEvaluator;
+        _epgSchedulingService = epgSchedulingService;
     }
 
     /// <summary>
@@ -109,21 +112,39 @@ public class EventDvrService
             return existingRecording;
         }
 
-        // Schedule the recording
+        // Get optimized recording times from EPG (if available)
+        // This uses EPG data to determine accurate start/end times instead of hard-coded duration
+        var prePadding = 5;
+        var postPadding = 30;
+        var timeOptimization = await _epgSchedulingService.GetOptimizedRecordingTimesAsync(
+            evt, channel, prePadding, postPadding);
+
+        if (timeOptimization.TimeMismatchDetected)
+        {
+            _logger.LogWarning("[EventDVR] EPG time mismatch for event {EventId}: {Title} - " +
+                "Sports API: {ApiTime}, EPG differs by {Diff:+0;-0} minutes. Using optimized times.",
+                eventId, evt.Title, evt.EventDate.ToString("HH:mm"), timeOptimization.TimeMismatchMinutes);
+        }
+
+        // Schedule the recording with EPG-optimized times
         try
         {
             var recording = await _dvrService.ScheduleRecordingAsync(new ScheduleDvrRecordingRequest
             {
                 EventId = eventId,
                 ChannelId = channel.Id,
-                ScheduledStart = evt.EventDate,
-                ScheduledEnd = evt.EventDate.AddHours(3), // Default 3 hour duration for sports
-                PrePadding = 5,
-                PostPadding = 30
+                ScheduledStart = timeOptimization.OptimizedStartTime.AddMinutes(prePadding), // Remove double padding
+                ScheduledEnd = timeOptimization.OptimizedEndTime.AddMinutes(-postPadding), // Remove double padding
+                PrePadding = prePadding,
+                PostPadding = postPadding
             });
 
-            _logger.LogInformation("[EventDVR] Scheduled DVR recording for event {EventId}: {Title} on channel {Channel} ({Quality})",
-                eventId, evt.Title, channel.Name, channel.DetectedQuality ?? "HD");
+            var durationInfo = timeOptimization.UsedEpgData
+                ? $"{timeOptimization.DurationMinutes}min from EPG"
+                : $"{timeOptimization.DurationMinutes}min (default)";
+
+            _logger.LogInformation("[EventDVR] Scheduled DVR recording for event {EventId}: {Title} on channel {Channel} ({Quality}) - {Duration}",
+                eventId, evt.Title, channel.Name, channel.DetectedQuality ?? "HD", durationInfo);
 
             return recording;
         }

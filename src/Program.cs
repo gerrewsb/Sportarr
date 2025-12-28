@@ -300,6 +300,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<Sportarr.Api.Servi
 builder.Services.AddScoped<Sportarr.Api.Services.DvrQualityScoreCalculator>(); // DVR quality score estimation
 builder.Services.AddScoped<Sportarr.Api.Services.XmltvParserService>(); // XMLTV EPG parser
 builder.Services.AddScoped<Sportarr.Api.Services.EpgService>(); // EPG management service
+builder.Services.AddScoped<Sportarr.Api.Services.EpgSchedulingService>(); // EPG-based DVR scheduling optimization
 builder.Services.AddScoped<Sportarr.Api.Services.FilteredExportService>(); // Filtered M3U/EPG export service
 
 // Add ASP.NET Core Authentication (Sonarr/Radarr pattern)
