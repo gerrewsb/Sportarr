@@ -3970,6 +3970,41 @@ app.MapPut("/api/settings", async (AppSettings updatedSettings, Sportarr.Api.Ser
     var config = await configService.GetConfigAsync();
     var previousEnableMultiPart = config.EnableMultiPartEpisodes;
 
+    // CRITICAL: Validate credentials when enabling Forms or Basic authentication
+    // This prevents users from locking themselves out
+    if (securitySettings != null)
+    {
+        var authMethod = securitySettings.AuthenticationMethod?.ToLower() ?? "none";
+        if (authMethod == "forms" || authMethod == "basic")
+        {
+            // Check if credentials already exist in config
+            var hasExistingCredentials = !string.IsNullOrWhiteSpace(config.Username) &&
+                                         !string.IsNullOrWhiteSpace(config.PasswordHash);
+
+            // Check if user is providing new credentials
+            var hasNewUsername = !string.IsNullOrWhiteSpace(securitySettings.Username);
+            var hasNewPassword = !string.IsNullOrWhiteSpace(securitySettings.Password);
+
+            if (!hasExistingCredentials && !hasNewUsername)
+            {
+                logger.LogWarning("[CONFIG] Rejected: Cannot enable {AuthMethod} authentication without username", authMethod);
+                return Results.BadRequest(new { error = "Username is required when enabling authentication." });
+            }
+
+            if (!hasExistingCredentials && !hasNewPassword)
+            {
+                logger.LogWarning("[CONFIG] Rejected: Cannot enable {AuthMethod} authentication without password", authMethod);
+                return Results.BadRequest(new { error = "Password is required when enabling authentication for the first time." });
+            }
+
+            if (hasNewPassword && securitySettings.Password!.Length < 6)
+            {
+                logger.LogWarning("[CONFIG] Rejected: Password too short");
+                return Results.BadRequest(new { error = "Password must be at least 6 characters." });
+            }
+        }
+    }
+
     // Handle password hashing if needed
     // Only call SetCredentialsAsync when BOTH username AND password are provided (user is setting new credentials)
     // If only username is provided (no password), it's just a settings save - credentials are managed via config.xml

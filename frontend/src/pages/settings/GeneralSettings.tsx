@@ -211,6 +211,45 @@ export default function GeneralSettings({ showAdvanced = false }: GeneralSetting
   };
 
   const handleSave = async () => {
+    // Validate credentials when enabling Forms or Basic authentication
+    if (securitySettings.authenticationMethod === 'forms' || securitySettings.authenticationMethod === 'basic') {
+      // Check if this is a new auth setup (no existing credentials) or user is changing password
+      const needsCredentials = !initialValues.current?.security?.username ||
+                               initialValues.current?.security?.authenticationMethod === 'none' ||
+                               initialValues.current?.security?.authenticationMethod === 'external';
+
+      if (needsCredentials) {
+        // First time enabling auth - require both username and password
+        if (!securitySettings.username || securitySettings.username.trim().length === 0) {
+          toast.error('Username Required', {
+            description: 'Please enter a username before enabling authentication.',
+          });
+          return;
+        }
+        if (!securitySettings.password || securitySettings.password.trim().length < 6) {
+          toast.error('Password Required', {
+            description: 'Please enter a password (minimum 6 characters) before enabling authentication.',
+          });
+          return;
+        }
+      } else {
+        // Existing auth - username is required, password is optional (to keep existing)
+        if (!securitySettings.username || securitySettings.username.trim().length === 0) {
+          toast.error('Username Required', {
+            description: 'Username cannot be empty.',
+          });
+          return;
+        }
+        // If user entered a new password, validate minimum length
+        if (securitySettings.password && securitySettings.password.trim().length > 0 && securitySettings.password.trim().length < 6) {
+          toast.error('Password Too Short', {
+            description: 'Password must be at least 6 characters.',
+          });
+          return;
+        }
+      }
+    }
+
     setSaving(true);
     try {
       // First fetch current settings
@@ -232,7 +271,22 @@ export default function GeneralSettings({ showAdvanced = false }: GeneralSetting
       };
 
       // Save to API
-      await apiPut('/api/settings', updatedSettings);
+      const saveResponse = await apiPut('/api/settings', updatedSettings);
+
+      if (!saveResponse.ok) {
+        // Handle validation errors from backend
+        try {
+          const errorData = await saveResponse.json();
+          toast.error('Save Failed', {
+            description: errorData.error || 'Failed to save settings.',
+          });
+        } catch {
+          toast.error('Save Failed', {
+            description: 'Failed to save settings. Please try again.',
+          });
+        }
+        return;
+      }
 
       // Reset unsaved changes flag after successful save
       initialValues.current = {
@@ -246,8 +300,9 @@ export default function GeneralSettings({ showAdvanced = false }: GeneralSetting
       };
       setHasUnsavedChanges(false);
 
-      // Note: We intentionally keep the apiKeyRegenerated warning visible even after saving
-      // because the user still needs to restart Sportarr for the new API key to take effect
+      toast.success('Settings Saved', {
+        description: 'Your settings have been saved successfully.',
+      });
     } catch (error) {
       console.error('Failed to save settings:', error);
       toast.error('Save Failed', {
