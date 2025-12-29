@@ -253,6 +253,11 @@ export default function EventDetailsModal({ isOpen, onClose, event }: EventDetai
 
       const updatedEvent = await response.json();
       setIsMonitored(updatedEvent.monitored);
+
+      // Update part statuses - when event is unmonitored, all parts become unmonitored
+      if (updatedEvent.partStatuses) {
+        setPartStatuses(updatedEvent.partStatuses);
+      }
     } catch (error) {
       console.error('Failed to toggle monitor:', error);
       toast.error('Update Failed', {
