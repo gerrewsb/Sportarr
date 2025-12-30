@@ -270,7 +270,7 @@ export const useActivityCounts = () => {
       const { data } = await apiClient.get<ActivityCounts>('/activity/counts');
       return data;
     },
-    refetchInterval: 5000, // Poll every 5s for badge updates
+    refetchInterval: 30000, // Poll every 30s for badge updates
     notifyOnChangeProps: ['data'],
   });
 };
