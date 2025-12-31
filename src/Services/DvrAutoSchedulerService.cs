@@ -260,8 +260,13 @@ public class DvrAutoSchedulerService : BackgroundService
             return result;
         }
 
+        _logger.LogInformation("[DVR Auto-Scheduler] Found {Count} IPTV channels with EPG mapping for scheduling",
+            channels.Count);
+
         // Get all sports EPG programs in our scheduling window
         var tvgIds = channels.Select(c => c.TvgId!).ToList();
+        _logger.LogDebug("[DVR Auto-Scheduler] Looking for EPG programs on channels: {Channels}",
+            string.Join(", ", channels.Select(c => $"{c.Name} (TvgId: {c.TvgId})")));
         var sportsPrograms = await db.EpgPrograms
             .Where(p => tvgIds.Contains(p.ChannelId))
             .Where(p => p.StartTime >= now && p.StartTime <= schedulingCutoff)
@@ -275,7 +280,23 @@ public class DvrAutoSchedulerService : BackgroundService
             return result;
         }
 
-        _logger.LogDebug("[DVR Auto-Scheduler] Found {Count} sports programs in EPG to check", sportsPrograms.Count);
+        // Log which channels have sports programs
+        var programsByChannel = sportsPrograms.GroupBy(p => p.ChannelId)
+            .Select(g => new { ChannelId = g.Key, Count = g.Count() })
+            .ToList();
+
+        _logger.LogInformation("[DVR Auto-Scheduler] Found {Count} sports programs in EPG across {ChannelCount} channels",
+            sportsPrograms.Count, programsByChannel.Count);
+
+        foreach (var channelGroup in programsByChannel)
+        {
+            var channelName = channels.FirstOrDefault(c => c.TvgId == channelGroup.ChannelId)?.Name ?? channelGroup.ChannelId;
+            _logger.LogDebug("[DVR Auto-Scheduler] Channel '{Channel}' has {Count} sports programs",
+                channelName, channelGroup.Count);
+        }
+
+        // Track which EPG programs have been matched (to prevent one program matching multiple events)
+        var matchedProgramIds = new HashSet<int>();
 
         // Try to match events to EPG programs
         foreach (var evt in eventsWithoutRecordings)
@@ -285,12 +306,20 @@ public class DvrAutoSchedulerService : BackgroundService
 
             result.EventsChecked++;
 
+            // Filter out already-matched programs before searching
+            var availablePrograms = sportsPrograms
+                .Where(p => !matchedProgramIds.Contains(p.Id))
+                .ToList();
+
             // Try to find a matching EPG program for this event
-            var matchingProgram = FindMatchingEpgProgram(evt, sportsPrograms);
+            var matchingProgram = FindMatchingEpgProgram(evt, availablePrograms);
             if (matchingProgram == null)
             {
                 continue;
             }
+
+            // Mark this program as matched (prevent duplicate scheduling)
+            matchedProgramIds.Add(matchingProgram.Id);
 
             // Find the channel for this EPG program
             var channel = channels.FirstOrDefault(c => c.TvgId == matchingProgram.ChannelId);
@@ -345,6 +374,7 @@ public class DvrAutoSchedulerService : BackgroundService
     /// Matches based on:
     /// 1. Time proximity (program start within 1 hour of event start)
     /// 2. Title/team name matching
+    /// 3. Sport type/league verification (NHL should not match NBA, etc.)
     /// </summary>
     private EpgProgram? FindMatchingEpgProgram(Event evt, List<EpgProgram> programs)
     {
@@ -356,6 +386,13 @@ public class DvrAutoSchedulerService : BackgroundService
 
         if (candidatePrograms.Count == 0)
             return null;
+
+        // Get league/sport info for validation
+        var leagueName = evt.League?.Name?.ToLowerInvariant() ?? "";
+        var sportType = evt.League?.Sport?.ToLowerInvariant() ?? "";
+
+        // Build sport-specific keywords to check against EPG (to prevent cross-sport matching)
+        var sportKeywords = GetSportKeywords(leagueName, sportType);
 
         // Try to find a match based on team names or event title
         var searchTerms = new List<string>();
@@ -388,15 +425,49 @@ public class DvrAutoSchedulerService : BackgroundService
         foreach (var program in candidatePrograms)
         {
             var normalizedProgramTitle = NormalizeForSearch(program.Title);
+            var normalizedProgramDesc = NormalizeForSearch(program.Description ?? "");
+            var normalizedCategory = NormalizeForSearch(program.Category ?? "");
+            var combinedProgramText = $"{normalizedProgramTitle} {normalizedProgramDesc} {normalizedCategory}";
+
+            // CRITICAL: Check if this program mentions a DIFFERENT sport/league
+            // If the program clearly indicates a different sport, skip it entirely
+            if (IsDifferentSport(combinedProgramText, sportKeywords))
+            {
+                _logger.LogDebug("[DVR Auto-Scheduler] Skipping EPG program '{Program}' - appears to be different sport than event '{Event}' ({League})",
+                    program.Title, evt.Title, leagueName);
+                continue;
+            }
+
             var score = 0;
 
-            // Score based on matching search terms
+            // Score based on matching search terms (team names)
+            var matchedTerms = 0;
             foreach (var term in searchTerms)
             {
                 if (normalizedProgramTitle.Contains(term))
                 {
                     score += 30; // Each matching term adds 30 points
+                    matchedTerms++;
                 }
+            }
+
+            // REQUIRE at least one team name match for sports events
+            // This prevents generic "Live Sports" programs from matching random events
+            if (matchedTerms == 0)
+            {
+                continue;
+            }
+
+            // Bonus for matching BOTH teams (much higher confidence)
+            if (matchedTerms >= 2)
+            {
+                score += 40; // Big bonus for matching both teams
+            }
+
+            // Bonus if EPG category/description matches the sport type
+            if (sportKeywords.Any(kw => combinedProgramText.Contains(kw)))
+            {
+                score += 20;
             }
 
             // Bonus for time proximity (closer = better)
@@ -409,8 +480,9 @@ public class DvrAutoSchedulerService : BackgroundService
             if (program.IsSportsProgram)
                 score += 10;
 
-            // Minimum threshold of 40 points to be considered a match
-            if (score > bestScore && score >= 40)
+            // Minimum threshold of 50 points to be considered a match (raised from 40)
+            // This requires either both teams to match OR one team + sport match
+            if (score > bestScore && score >= 50)
             {
                 bestScore = score;
                 bestMatch = program;
@@ -424,6 +496,88 @@ public class DvrAutoSchedulerService : BackgroundService
         }
 
         return bestMatch;
+    }
+
+    /// <summary>
+    /// Get sport-specific keywords for a league to verify EPG matches
+    /// </summary>
+    private static List<string> GetSportKeywords(string leagueName, string sportType)
+    {
+        var keywords = new List<string>();
+
+        // Add specific league name
+        if (!string.IsNullOrEmpty(leagueName))
+            keywords.Add(leagueName);
+
+        // Add common sport type keywords
+        if (sportType.Contains("hockey") || leagueName.Contains("nhl"))
+        {
+            keywords.AddRange(new[] { "hockey", "nhl", "ice" });
+        }
+        else if (sportType.Contains("basketball") || leagueName.Contains("nba"))
+        {
+            keywords.AddRange(new[] { "basketball", "nba", "hoops" });
+        }
+        else if (sportType.Contains("football") || leagueName.Contains("nfl"))
+        {
+            keywords.AddRange(new[] { "football", "nfl", "gridiron" });
+        }
+        else if (sportType.Contains("baseball") || leagueName.Contains("mlb"))
+        {
+            keywords.AddRange(new[] { "baseball", "mlb" });
+        }
+        else if (sportType.Contains("soccer") || leagueName.Contains("mls") || leagueName.Contains("premier"))
+        {
+            keywords.AddRange(new[] { "soccer", "football", "mls", "premier" });
+        }
+        else if (sportType.Contains("mma") || sportType.Contains("fighting") || leagueName.Contains("ufc"))
+        {
+            keywords.AddRange(new[] { "ufc", "mma", "fighting", "boxing" });
+        }
+        else if (sportType.Contains("motorsport") || leagueName.Contains("f1") || leagueName.Contains("formula"))
+        {
+            keywords.AddRange(new[] { "f1", "formula", "racing", "motorsport", "nascar", "indycar" });
+        }
+
+        return keywords;
+    }
+
+    /// <summary>
+    /// Check if an EPG program appears to be for a different sport than the event
+    /// </summary>
+    private static bool IsDifferentSport(string programText, List<string> eventSportKeywords)
+    {
+        // Define conflicting sport pairs - if the EPG mentions one and we're looking for the other, it's wrong
+        var conflictingSports = new Dictionary<string, string[]>
+        {
+            // Hockey vs Basketball
+            { "hockey", new[] { "basketball", "nba" } },
+            { "nhl", new[] { "basketball", "nba" } },
+            { "basketball", new[] { "hockey", "nhl" } },
+            { "nba", new[] { "hockey", "nhl" } },
+            // Football (American) vs Soccer
+            { "nfl", new[] { "soccer", "mls" } },
+            // Baseball vs others
+            { "mlb", new[] { "hockey", "nhl", "basketball", "nba" } },
+            { "baseball", new[] { "hockey", "nhl", "basketball", "nba" } },
+        };
+
+        // Check if the program explicitly mentions a sport that conflicts with the event's sport
+        foreach (var eventKeyword in eventSportKeywords)
+        {
+            if (conflictingSports.TryGetValue(eventKeyword, out var conflicts))
+            {
+                foreach (var conflict in conflicts)
+                {
+                    if (programText.Contains(conflict))
+                    {
+                        return true; // This program mentions a conflicting sport
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
