@@ -382,7 +382,27 @@ public class EventMappingService
 
                 result.Success = true;
                 result.RequestId = responseData.TryGetProperty("requestId", out var reqId) ? reqId.GetInt32() : 0;
-                result.Message = "Mapping request submitted successfully. It will be reviewed by the community.";
+                result.Message = "Mapping request submitted successfully. It will be reviewed by the Sportarr team.";
+
+                // Save the submitted request locally for status tracking
+                if (result.RequestId > 0)
+                {
+                    var submittedRequest = new SubmittedMappingRequest
+                    {
+                        RemoteRequestId = result.RequestId,
+                        SportType = sportType,
+                        LeagueName = leagueName,
+                        ReleaseNames = string.Join(", ", releaseNames),
+                        Status = "pending",
+                        SubmittedAt = DateTime.UtcNow
+                    };
+
+                    _db.SubmittedMappingRequests.Add(submittedRequest);
+                    await _db.SaveChangesAsync();
+
+                    _logger.LogInformation("[EventMapping] Saved submitted request {RequestId} for tracking",
+                        result.RequestId);
+                }
 
                 _logger.LogInformation("[EventMapping] Submitted mapping request for {SportType}/{LeagueName}",
                     sportType, leagueName ?? "all");
@@ -415,6 +435,126 @@ public class EventMappingService
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Check status of pending submitted requests and return any that have been reviewed
+    /// </summary>
+    public async Task<List<MappingRequestStatusUpdate>> CheckPendingRequestStatusesAsync()
+    {
+        var updates = new List<MappingRequestStatusUpdate>();
+
+        try
+        {
+            // Get all pending requests that haven't been notified
+            var pendingRequests = await _db.SubmittedMappingRequests
+                .Where(r => r.Status == "pending" && !r.UserNotified)
+                .ToListAsync();
+
+            if (pendingRequests.Count == 0)
+            {
+                return updates;
+            }
+
+            _logger.LogDebug("[EventMapping] Checking status of {Count} pending requests", pendingRequests.Count);
+
+            // Build request body with all pending request IDs
+            var requestIds = pendingRequests.Select(r => r.RemoteRequestId).ToList();
+            var requestBody = new { requestIds };
+
+            var json = JsonSerializer.Serialize(requestBody, JsonOptions);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync($"{_apiBaseUrl}/event-mappings/status", content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("[EventMapping] Status check API returned {StatusCode}", response.StatusCode);
+                return updates;
+            }
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            var statusResponse = JsonSerializer.Deserialize<MappingStatusApiResponse>(responseJson, JsonOptions);
+
+            if (statusResponse?.Statuses == null)
+            {
+                return updates;
+            }
+
+            // Process each status update
+            foreach (var status in statusResponse.Statuses)
+            {
+                var localRequest = pendingRequests.FirstOrDefault(r => r.RemoteRequestId == status.Id);
+                if (localRequest == null)
+                    continue;
+
+                // Check if status has changed from pending
+                if (status.Status != "pending" && localRequest.Status == "pending")
+                {
+                    localRequest.Status = status.Status;
+                    localRequest.ReviewNotes = status.ReviewNotes;
+                    localRequest.ReviewedAt = !string.IsNullOrEmpty(status.ReviewedAt)
+                        ? DateTime.Parse(status.ReviewedAt)
+                        : DateTime.UtcNow;
+                    localRequest.LastCheckedAt = DateTime.UtcNow;
+
+                    updates.Add(new MappingRequestStatusUpdate
+                    {
+                        LocalId = localRequest.Id,
+                        RemoteId = localRequest.RemoteRequestId,
+                        SportType = localRequest.SportType,
+                        LeagueName = localRequest.LeagueName,
+                        Status = status.Status,
+                        ReviewNotes = status.ReviewNotes,
+                        IsApproved = status.Status == "approved",
+                        IsRejected = status.Status == "rejected"
+                    });
+
+                    _logger.LogInformation("[EventMapping] Request {RequestId} status changed to {Status}",
+                        status.Id, status.Status);
+                }
+                else
+                {
+                    localRequest.LastCheckedAt = DateTime.UtcNow;
+                }
+            }
+
+            if (updates.Count > 0)
+            {
+                await _db.SaveChangesAsync();
+            }
+
+            return updates;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[EventMapping] Error checking pending request statuses");
+            return updates;
+        }
+    }
+
+    /// <summary>
+    /// Mark a request as notified to the user
+    /// </summary>
+    public async Task MarkRequestAsNotifiedAsync(int localId)
+    {
+        var request = await _db.SubmittedMappingRequests.FindAsync(localId);
+        if (request != null)
+        {
+            request.UserNotified = true;
+            await _db.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Get all unnotified status updates (for showing to user)
+    /// </summary>
+    public async Task<List<SubmittedMappingRequest>> GetUnnotifiedUpdatesAsync()
+    {
+        return await _db.SubmittedMappingRequests
+            .Where(r => r.Status != "pending" && !r.UserNotified)
+            .OrderByDescending(r => r.ReviewedAt)
+            .ToListAsync();
     }
 }
 
@@ -468,4 +608,42 @@ public class EventMappingApiResponse
     public List<EventMappingDto>? Mappings { get; set; }
     public int Count { get; set; }
     public string? LastUpdate { get; set; }
+}
+
+/// <summary>
+/// Status update for a mapping request
+/// </summary>
+public class MappingRequestStatusUpdate
+{
+    public int LocalId { get; set; }
+    public int RemoteId { get; set; }
+    public string SportType { get; set; } = string.Empty;
+    public string? LeagueName { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string? ReviewNotes { get; set; }
+    public bool IsApproved { get; set; }
+    public bool IsRejected { get; set; }
+}
+
+/// <summary>
+/// API response for status check
+/// </summary>
+public class MappingStatusApiResponse
+{
+    public List<MappingStatusDto>? Statuses { get; set; }
+    public int Checked { get; set; }
+    public int Found { get; set; }
+}
+
+/// <summary>
+/// Individual status from API
+/// </summary>
+public class MappingStatusDto
+{
+    public int Id { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string? ReviewNotes { get; set; }
+    public string? ReviewedAt { get; set; }
+    public string? SportType { get; set; }
+    public string? LeagueName { get; set; }
 }

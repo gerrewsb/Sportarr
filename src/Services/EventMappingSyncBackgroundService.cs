@@ -64,6 +64,15 @@ public class EventMappingSyncBackgroundService : BackgroundService
                         "[Event Mapping Sync] Sync completed with errors: {Errors}",
                         string.Join(", ", result.Errors));
                 }
+
+                // Also check status of any pending mapping requests
+                var statusUpdates = await eventMappingService.CheckPendingRequestStatusesAsync();
+                if (statusUpdates.Count > 0)
+                {
+                    _logger.LogInformation(
+                        "[Event Mapping Sync] {Count} mapping request(s) have been reviewed",
+                        statusUpdates.Count);
+                }
             }
             catch (Exception ex)
             {

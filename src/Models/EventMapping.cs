@@ -122,3 +122,62 @@ public class QueryConfig
     /// </summary>
     public string? DateFormat { get; set; }
 }
+
+/// <summary>
+/// Tracks mapping requests submitted by this Sportarr instance.
+/// Used to check status and notify user when requests are approved/rejected.
+/// </summary>
+public class SubmittedMappingRequest
+{
+    public int Id { get; set; }
+
+    /// <summary>
+    /// The remote request ID from Sportarr-API
+    /// </summary>
+    public int RemoteRequestId { get; set; }
+
+    /// <summary>
+    /// Sport type submitted
+    /// </summary>
+    public string SportType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// League name submitted (optional)
+    /// </summary>
+    public string? LeagueName { get; set; }
+
+    /// <summary>
+    /// Release names submitted (comma-separated for display)
+    /// </summary>
+    public string ReleaseNames { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Current status: pending, approved, rejected
+    /// </summary>
+    public string Status { get; set; } = "pending";
+
+    /// <summary>
+    /// Review notes from admin (if rejected, contains reason)
+    /// </summary>
+    public string? ReviewNotes { get; set; }
+
+    /// <summary>
+    /// When the request was submitted
+    /// </summary>
+    public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// When the status was last checked
+    /// </summary>
+    public DateTime? LastCheckedAt { get; set; }
+
+    /// <summary>
+    /// When the request was reviewed (approved/rejected)
+    /// </summary>
+    public DateTime? ReviewedAt { get; set; }
+
+    /// <summary>
+    /// Whether the user has been notified of the status change
+    /// </summary>
+    public bool UserNotified { get; set; } = false;
+}

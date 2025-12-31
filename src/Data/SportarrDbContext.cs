@@ -56,6 +56,9 @@ public class SportarrDbContext : DbContext
     // Event mapping (synced from Sportarr-API with local overrides)
     public DbSet<EventMapping> EventMappings => Set<EventMapping>();
 
+    // Submitted mapping requests (tracks requests sent to Sportarr-API for status checking)
+    public DbSet<SubmittedMappingRequest> SubmittedMappingRequests => Set<SubmittedMappingRequest>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -858,6 +861,24 @@ public class SportarrDbContext : DbContext
             entity.HasIndex(e => e.IsActive);
             entity.HasIndex(e => e.Priority);
             entity.HasIndex(e => e.Source);
+        });
+
+        // ============================================================================
+        // SUBMITTED MAPPING REQUEST Configuration (for status tracking)
+        // ============================================================================
+
+        modelBuilder.Entity<SubmittedMappingRequest>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.SportType).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.LeagueName).HasMaxLength(200);
+            entity.Property(e => e.ReleaseNames).IsRequired().HasMaxLength(1000);
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.ReviewNotes).HasMaxLength(1000);
+
+            entity.HasIndex(e => e.RemoteRequestId).IsUnique();
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.UserNotified);
         });
     }
 }

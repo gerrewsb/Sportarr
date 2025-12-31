@@ -12396,6 +12396,62 @@ app.MapPost("/api/eventmapping/request", async (
     }
 });
 
+// GET /api/eventmapping/request/status - Get unnotified mapping request status updates
+// This allows the frontend to check for approved/rejected requests and show notifications
+app.MapGet("/api/eventmapping/request/status", async (
+    Sportarr.Api.Services.EventMappingService eventMappingService,
+    ILogger<Program> logger) =>
+{
+    try
+    {
+        // First check for any new status updates from the API
+        await eventMappingService.CheckPendingRequestStatusesAsync();
+
+        // Get all unnotified updates
+        var updates = await eventMappingService.GetUnnotifiedUpdatesAsync();
+
+        return Results.Ok(new
+        {
+            updates = updates.Select(u => new
+            {
+                id = u.Id,
+                remoteRequestId = u.RemoteRequestId,
+                sportType = u.SportType,
+                leagueName = u.LeagueName,
+                releaseNames = u.ReleaseNames,
+                status = u.Status,
+                reviewNotes = u.ReviewNotes,
+                reviewedAt = u.ReviewedAt?.ToString("o"),
+                submittedAt = u.SubmittedAt.ToString("o")
+            }),
+            count = updates.Count
+        });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "[EventMapping] Error fetching request status updates");
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+// POST /api/eventmapping/request/status/{id}/acknowledge - Mark a status update as seen/notified
+app.MapPost("/api/eventmapping/request/status/{id}/acknowledge", async (
+    int id,
+    Sportarr.Api.Services.EventMappingService eventMappingService,
+    ILogger<Program> logger) =>
+{
+    try
+    {
+        await eventMappingService.MarkRequestAsNotifiedAsync(id);
+        return Results.Ok(new { success = true });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "[EventMapping] Error acknowledging request status");
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 // Fallback to index.html for SPA routing
 app.MapFallbackToFile("index.html");
 

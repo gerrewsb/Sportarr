@@ -77,6 +77,18 @@ interface EventMappingSubmitResult {
   message: string;
 }
 
+interface MappingRequestStatusUpdate {
+  id: number;
+  remoteRequestId: number;
+  sportType: string;
+  leagueName?: string;
+  releaseNames: string;
+  status: 'approved' | 'rejected';
+  reviewNotes?: string;
+  reviewedAt?: string;
+  submittedAt: string;
+}
+
 interface UserLeague {
   id: number;
   name: string;
@@ -126,6 +138,54 @@ export default function MediaManagementSettings({ showAdvanced: propShowAdvanced
   const [emReleaseNames, setEmReleaseNames] = useState('');
   const [emReason, setEmReason] = useState('');
   const [emExampleRelease, setEmExampleRelease] = useState('');
+
+  // Check for mapping request status updates (approved/rejected)
+  useEffect(() => {
+    const checkMappingRequestStatus = async () => {
+      try {
+        const response = await apiGet('/api/eventmapping/request/status');
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const updates: MappingRequestStatusUpdate[] = data.updates || [];
+
+        // Show persistent toast for each unnotified status update
+        for (const update of updates) {
+          const isApproved = update.status === 'approved';
+          const title = isApproved ? 'Mapping Request Approved!' : 'Mapping Request Rejected';
+          const description = update.leagueName
+            ? `Your request for ${update.sportType} / ${update.leagueName} has been ${update.status}.`
+            : `Your request for ${update.sportType} has been ${update.status}.`;
+
+          if (isApproved) {
+            toast.success(title, {
+              description: update.reviewNotes
+                ? `${description}\n\nNote: ${update.reviewNotes}`
+                : `${description}\n\nThe mapping is now available - sync to get it.`,
+              duration: Infinity,
+            });
+          } else {
+            toast.error(title, {
+              description: update.reviewNotes
+                ? `${description}\n\nReason: ${update.reviewNotes}`
+                : description,
+              duration: Infinity,
+            });
+          }
+
+          // Mark as acknowledged so it doesn't show again
+          await apiPost(`/api/eventmapping/request/status/${update.id}/acknowledge`, {});
+        }
+      } catch (error) {
+        console.error('Failed to check mapping request status:', error);
+      }
+    };
+
+    // Check on mount and when advanced settings are shown
+    if (showAdvanced) {
+      checkMappingRequestStatus();
+    }
+  }, [showAdvanced]);
 
   // Fetch user's leagues for the event mapping form
   const { data: userLeagues = [] } = useQuery<UserLeague[]>({
@@ -323,7 +383,7 @@ export default function MediaManagementSettings({ showAdvanced: propShowAdvanced
         if (result.success) {
           toast.success('Request Submitted', {
             description: result.message,
-            duration: Infinity,
+            duration: 8000,
           });
           setEmSelectedLeague(null);
           setEmLeagueSearch('');
