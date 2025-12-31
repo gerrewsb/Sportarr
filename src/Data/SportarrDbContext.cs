@@ -53,6 +53,9 @@ public class SportarrDbContext : DbContext
     public DbSet<EpgChannel> EpgChannels => Set<EpgChannel>();
     public DbSet<EpgProgram> EpgPrograms => Set<EpgProgram>();
 
+    // Scene mapping (synced from Sportarr-API with local overrides)
+    public DbSet<SceneMapping> SceneMappings => Set<SceneMapping>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -824,6 +827,37 @@ public class SportarrDbContext : DbContext
             entity.HasIndex(p => p.EndTime);
             entity.HasIndex(p => p.IsSportsProgram);
             entity.HasIndex(p => p.MatchedEventId);
+        });
+
+        // ============================================================================
+        // SCENE MAPPING Configuration
+        // ============================================================================
+
+        modelBuilder.Entity<SceneMapping>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.SportType).IsRequired().HasMaxLength(100);
+            entity.Property(s => s.LeagueId).HasMaxLength(50);
+            entity.Property(s => s.LeagueName).HasMaxLength(200);
+            entity.Property(s => s.Source).IsRequired().HasMaxLength(50);
+            entity.Property(s => s.SessionPatternsJson).HasMaxLength(4000);
+            entity.Property(s => s.QueryConfigJson).HasMaxLength(2000);
+
+            // SceneNames stored as JSON array
+            entity.Property(s => s.SceneNames).HasConversion(
+                v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                v => System.Text.Json.JsonSerializer.Deserialize<List<string>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new List<string>()
+            ).Metadata.SetValueComparer(new ValueComparer<List<string>>(
+                (c1, c2) => c1 != null && c2 != null && c1.SequenceEqual(c2),
+                c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                c => c.ToList()));
+
+            // Unique constraint: one mapping per sport/league combination
+            entity.HasIndex(s => new { s.SportType, s.LeagueId }).IsUnique();
+            entity.HasIndex(s => s.RemoteId);
+            entity.HasIndex(s => s.IsActive);
+            entity.HasIndex(s => s.Priority);
+            entity.HasIndex(s => s.Source);
         });
     }
 }

@@ -300,6 +300,7 @@ builder.Services.AddScoped<Sportarr.Api.Services.ProvideImportItemService>(); //
 builder.Services.AddScoped<Sportarr.Api.Services.EventQueryService>(); // Universal: Sport-aware query builder for all sports
 builder.Services.AddScoped<Sportarr.Api.Services.LeagueEventSyncService>(); // Syncs events from TheSportsDB to populate leagues
 builder.Services.AddScoped<Sportarr.Api.Services.SeasonSearchService>(); // Season-level search for manual season pack discovery
+builder.Services.AddScoped<Sportarr.Api.Services.SceneMappingService>(); // Scene mapping sync and lookup (like TheXEM for Sonarr)
 builder.Services.AddHostedService<Sportarr.Api.Services.LeagueEventAutoSyncService>(); // Background service for automatic periodic event sync
 
 // TheSportsDB client for universal sports metadata (via Sportarr-API)
