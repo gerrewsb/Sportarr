@@ -50,9 +50,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // If authenticated (either via session or auth disabled), allow access
         if (data.authenticated) {
           console.log('[AUTH] Authenticated, allowing access');
-          // If on login page and authenticated, redirect to main app
+          // If on login page and authenticated, redirect to returnUrl or main app
           if (currentPath === '/login') {
-            navigate('/leagues', { replace: true });
+            const searchParams = new URLSearchParams(window.location.search);
+            const returnUrl = searchParams.get('returnUrl') || '/leagues';
+            navigate(returnUrl, { replace: true });
           }
           return;
         }
