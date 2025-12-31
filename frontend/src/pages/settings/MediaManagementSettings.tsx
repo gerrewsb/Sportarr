@@ -123,6 +123,7 @@ export default function MediaManagementSettings({ showAdvanced: propShowAdvanced
   const [emLeagueSearch, setEmLeagueSearch] = useState('');
   const [emSportType, setEmSportType] = useState('');
   const [emLeagueName, setEmLeagueName] = useState('');
+  const [emLeagueNameManual, setEmLeagueNameManual] = useState(''); // For manual entry when "Other" is selected
   const [emReleaseNames, setEmReleaseNames] = useState('');
   const [emReason, setEmReason] = useState('');
   const [emExampleRelease, setEmExampleRelease] = useState('');
@@ -158,6 +159,33 @@ export default function MediaManagementSettings({ showAdvanced: propShowAdvanced
       (league.sportType || '').toLowerCase().includes(search)
     );
   }, [userLeagues, emLeagueSearch]);
+
+  // Fetch all available leagues from TheSportsDB cache for the league name dropdown
+  const { data: allLeagues = [] } = useQuery<{ name: string; sport: string }[]>({
+    queryKey: ['all-leagues-for-mapping'],
+    queryFn: async () => {
+      const response = await apiGet('/api/leagues/all');
+      if (!response.ok) return [];
+      const data = await response.json();
+      // API returns TheSportsDB league DTOs with strLeague and strSport
+      return data
+        .filter((league: any) => league.strLeague && league.strSport)
+        .map((league: any) => ({
+          name: league.strLeague,
+          sport: league.strSport
+        }));
+    },
+    enabled: showAdvanced && showEventMappingSubmitForm,
+    staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+  });
+
+  // Filter all leagues by selected sport type for the league name dropdown
+  const leaguesForSelectedSport = useMemo(() => {
+    if (!emSportType) return [];
+    return allLeagues
+      .filter(league => (league.sport || '').toLowerCase() === emSportType.toLowerCase())
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [allLeagues, emSportType]);
 
   // Use unsaved changes hook
   const { blockNavigation } = useUnsavedChanges(hasUnsavedChanges);
@@ -282,9 +310,12 @@ export default function MediaManagementSettings({ showAdvanced: propShowAdvanced
 
     setEventMappingsSubmitting(true);
     try {
+      // Use manual entry if "Other" was selected, otherwise use dropdown value
+      const finalLeagueName = emLeagueName === '__other__' ? emLeagueNameManual.trim() : emLeagueName.trim();
+
       const response = await apiPost('/api/eventmapping/request', {
         sportType: emSportType.trim(),
-        leagueName: emLeagueName.trim() || null,
+        leagueName: finalLeagueName || null,
         releaseNames: emReleaseNames.split(',').map(n => n.trim()).filter(n => n),
         reason: emReason.trim() || null,
         exampleRelease: emExampleRelease.trim() || null,
@@ -302,6 +333,7 @@ export default function MediaManagementSettings({ showAdvanced: propShowAdvanced
           setEmLeagueSearch('');
           setEmSportType('');
           setEmLeagueName('');
+          setEmLeagueNameManual('');
           setEmReleaseNames('');
           setEmReason('');
           setEmExampleRelease('');
@@ -1167,6 +1199,7 @@ export default function MediaManagementSettings({ showAdvanced: propShowAdvanced
                                 setEmSelectedLeague(null);
                                 setEmSportType('');
                                 setEmLeagueName('');
+                                setEmLeagueNameManual('');
                               }}
                               className="ml-auto text-gray-400 hover:text-white"
                             >
@@ -1194,7 +1227,12 @@ export default function MediaManagementSettings({ showAdvanced: propShowAdvanced
                         </label>
                         <select
                           value={emSportType}
-                          onChange={(e) => setEmSportType(e.target.value)}
+                          onChange={(e) => {
+                            setEmSportType(e.target.value);
+                            // Clear league name when sport type changes
+                            setEmLeagueName('');
+                            setEmLeagueNameManual('');
+                          }}
                           className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600"
                         >
                           <option value="">Select sport type...</option>
@@ -1205,13 +1243,44 @@ export default function MediaManagementSettings({ showAdvanced: propShowAdvanced
                       </div>
                       <div>
                         <label className="block text-white text-sm font-medium mb-1">League Name</label>
-                        <input
-                          type="text"
-                          value={emLeagueName}
-                          onChange={(e) => setEmLeagueName(e.target.value)}
-                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600"
-                          placeholder="e.g., Formula 1, UFC"
-                        />
+                        {emSportType && leaguesForSelectedSport.length > 0 ? (
+                          <>
+                            <select
+                              value={emLeagueName}
+                              onChange={(e) => {
+                                setEmLeagueName(e.target.value);
+                                if (e.target.value !== '__other__') {
+                                  setEmLeagueNameManual('');
+                                }
+                              }}
+                              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600"
+                            >
+                              <option value="">Select league...</option>
+                              {leaguesForSelectedSport.map((league) => (
+                                <option key={league.name} value={league.name}>{league.name}</option>
+                              ))}
+                              <option value="__other__">Other (type manually)</option>
+                            </select>
+                            {emLeagueName === '__other__' && (
+                              <input
+                                type="text"
+                                value={emLeagueNameManual}
+                                onChange={(e) => setEmLeagueNameManual(e.target.value)}
+                                className="w-full mt-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600"
+                                placeholder="Enter league name manually"
+                                autoFocus
+                              />
+                            )}
+                          </>
+                        ) : (
+                          <input
+                            type="text"
+                            value={emLeagueName}
+                            onChange={(e) => setEmLeagueName(e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600"
+                            placeholder={emSportType ? "No leagues found for this sport" : "Select sport type first"}
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1261,6 +1330,7 @@ export default function MediaManagementSettings({ showAdvanced: propShowAdvanced
                         setEmLeagueSearch('');
                         setEmSportType('');
                         setEmLeagueName('');
+                        setEmLeagueNameManual('');
                         setEmReleaseNames('');
                         setEmReason('');
                         setEmExampleRelease('');
