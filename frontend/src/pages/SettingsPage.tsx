@@ -17,10 +17,9 @@ import {
   CloudArrowDownIcon,
   Bars3Icon,
   XMarkIcon,
-  MapIcon,
 } from '@heroicons/react/24/outline';
 
-// Setting pages (to be created)
+// Setting pages
 import MediaManagementSettings from './settings/MediaManagementSettings';
 import ProfilesSettings from './settings/ProfilesSettings';
 import QualitySettings from './settings/QualitySettings';
@@ -34,7 +33,6 @@ import MetadataSettings from './settings/MetadataSettings';
 import GeneralSettings from './settings/GeneralSettings';
 import UISettings from './settings/UISettings';
 import TagsSettings from './settings/TagsSettings';
-import EventMappingsSettings from './settings/EventMappingsSettings';
 
 interface SettingsNavItem {
   name: string;
@@ -122,13 +120,6 @@ const settingsNavigation: SettingsNavItem[] = [
     path: '/settings/tags',
     icon: TagIcon,
     description: 'Manage tags for events, profiles, and indexers',
-  },
-  {
-    name: 'Event Mappings',
-    path: '/settings/eventmappings',
-    icon: MapIcon,
-    description: 'Map release naming patterns to official sports event names',
-    isAdvanced: true,
   },
 ];
 
@@ -240,7 +231,6 @@ export default function SettingsPage() {
             <Route path="/general" element={<GeneralSettings />} />
             <Route path="/ui" element={<UISettings />} />
             <Route path="/tags" element={<TagsSettings />} />
-            <Route path="/eventmappings" element={<EventMappingsSettings />} />
           </Routes>
         </div>
       </div>

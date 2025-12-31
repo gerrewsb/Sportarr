@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import { PlusIcon, FolderIcon, CheckIcon, XMarkIcon, CloudArrowDownIcon } from '@heroicons/react/24/outline';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { PlusIcon, FolderIcon, CheckIcon, XMarkIcon, CloudArrowDownIcon, MapIcon, ArrowPathIcon, CloudArrowUpIcon, CheckCircleIcon, XCircleIcon, ClockIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../utils/api';
 import FileBrowserModal from '../../components/FileBrowserModal';
 import SettingsHeader from '../../components/SettingsHeader';
@@ -50,6 +50,51 @@ interface MediaManagementSettingsData {
   chownGroup: string;
 }
 
+interface EventMapping {
+  id: number;
+  sportType: string;
+  leagueId?: string;
+  leagueName?: string;
+  releaseNames: string[];
+  isActive: boolean;
+  priority: number;
+  source: string;
+  lastSyncedAt?: string;
+}
+
+interface EventMappingSyncResult {
+  success: boolean;
+  added: number;
+  updated: number;
+  unchanged: number;
+  errors: string[];
+  duration: number;
+}
+
+interface EventMappingSubmitResult {
+  success: boolean;
+  requestId?: number;
+  message: string;
+}
+
+interface UserLeague {
+  id: number;
+  name: string;
+  sportType: string;
+  externalId: string;
+  badge?: string;
+}
+
+// Sport categories for the dropdown
+const SPORT_TYPES = [
+  'American Football', 'Athletics', 'Australian Football', 'Badminton', 'Baseball',
+  'Basketball', 'Climbing', 'Cricket', 'Cycling', 'Darts', 'Esports', 'Equestrian',
+  'Extreme Sports', 'Field Hockey', 'Fighting', 'Gaelic', 'Golf', 'Gymnastics',
+  'Handball', 'Ice Hockey', 'Lacrosse', 'Motorsport', 'Multi Sports', 'Netball',
+  'Rugby', 'Shooting', 'Skating', 'Skiing', 'Snooker', 'Soccer', 'Table Tennis',
+  'Tennis', 'Volleyball', 'Watersports', 'Weightlifting', 'Wintersports'
+];
+
 export default function MediaManagementSettings({ showAdvanced: propShowAdvanced = false }: MediaManagementSettingsProps) {
   const queryClient = useQueryClient();
   const [rootFolders, setRootFolders] = useState<RootFolder[]>([]);
@@ -66,6 +111,50 @@ export default function MediaManagementSettings({ showAdvanced: propShowAdvanced
 
   // Show Advanced toggle - managed locally per page like Sonarr/Indexers settings
   const [showAdvanced, setShowAdvanced] = useState(propShowAdvanced);
+
+  // Event Mappings state (advanced section)
+  const [eventMappings, setEventMappings] = useState<EventMapping[]>([]);
+  const [eventMappingsLoading, setEventMappingsLoading] = useState(false);
+  const [eventMappingsSyncing, setEventMappingsSyncing] = useState(false);
+  const [eventMappingsSubmitting, setEventMappingsSubmitting] = useState(false);
+  const [lastEventMappingSyncResult, setLastEventMappingSyncResult] = useState<EventMappingSyncResult | null>(null);
+  const [showEventMappingSubmitForm, setShowEventMappingSubmitForm] = useState(false);
+  const [emSelectedLeague, setEmSelectedLeague] = useState<UserLeague | null>(null);
+  const [emLeagueSearch, setEmLeagueSearch] = useState('');
+  const [emSportType, setEmSportType] = useState('');
+  const [emLeagueName, setEmLeagueName] = useState('');
+  const [emReleaseNames, setEmReleaseNames] = useState('');
+  const [emReason, setEmReason] = useState('');
+  const [emExampleRelease, setEmExampleRelease] = useState('');
+
+  // Fetch user's leagues for the event mapping form
+  const { data: userLeagues = [] } = useQuery<UserLeague[]>({
+    queryKey: ['leagues-for-mapping'],
+    queryFn: async () => {
+      const response = await apiGet('/api/leagues');
+      if (!response.ok) return [];
+      const data = await response.json();
+      return data.map((league: any) => ({
+        id: league.id,
+        name: league.name,
+        sportType: league.sportType,
+        externalId: league.externalId,
+        badge: league.badge
+      }));
+    },
+    enabled: showAdvanced,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Filter leagues based on search
+  const filteredLeagues = useMemo(() => {
+    if (!emLeagueSearch.trim()) return userLeagues;
+    const search = emLeagueSearch.toLowerCase();
+    return userLeagues.filter(league =>
+      league.name.toLowerCase().includes(search) ||
+      league.sportType.toLowerCase().includes(search)
+    );
+  }, [userLeagues, emLeagueSearch]);
 
   // Use unsaved changes hook
   const { blockNavigation } = useUnsavedChanges(hasUnsavedChanges);
@@ -117,6 +206,135 @@ export default function MediaManagementSettings({ showAdvanced: propShowAdvanced
       loadNamingPresets();
     }
   }, [settings.enableMultiPartEpisodes]);
+
+  // Load event mappings when advanced settings are shown
+  useEffect(() => {
+    if (showAdvanced && eventMappings.length === 0 && !eventMappingsLoading) {
+      loadEventMappings();
+    }
+  }, [showAdvanced]);
+
+  const loadEventMappings = async () => {
+    setEventMappingsLoading(true);
+    try {
+      const response = await apiGet('/api/eventmapping');
+      if (response.ok) {
+        const data = await response.json();
+        setEventMappings(data);
+      } else {
+        console.error('Failed to load event mappings:', response.status);
+      }
+    } catch (error) {
+      console.error('Failed to load event mappings:', error);
+    } finally {
+      setEventMappingsLoading(false);
+    }
+  };
+
+  const handleEventMappingSync = async (fullSync: boolean = false) => {
+    setEventMappingsSyncing(true);
+    try {
+      const endpoint = fullSync ? '/api/eventmapping/sync/full' : '/api/eventmapping/sync';
+      const response = await apiPost(endpoint, {});
+
+      if (response.ok) {
+        const result: EventMappingSyncResult = await response.json();
+        setLastEventMappingSyncResult(result);
+
+        if (result.success) {
+          toast.success('Sync Complete', {
+            description: `Added: ${result.added}, Updated: ${result.updated}, Unchanged: ${result.unchanged}`,
+          });
+          await loadEventMappings();
+        } else {
+          toast.error('Sync Issues', {
+            description: result.errors.join(', ') || 'Some errors occurred during sync',
+          });
+        }
+      } else {
+        const errorText = await response.text();
+        toast.error('Sync Failed', {
+          description: errorText || 'Failed to sync mappings from server',
+        });
+      }
+    } catch (error) {
+      console.error('Sync failed:', error);
+      toast.error('Sync Failed', {
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+      });
+    } finally {
+      setEventMappingsSyncing(false);
+    }
+  };
+
+  const handleEventMappingSubmitRequest = async () => {
+    if (!emSportType.trim()) {
+      toast.error('Sport Type Required', { description: 'Please enter a sport type (e.g., Motorsport, Fighting, Basketball)' });
+      return;
+    }
+    if (!emReleaseNames.trim()) {
+      toast.error('Release Names Required', { description: 'Please enter at least one release name pattern' });
+      return;
+    }
+
+    setEventMappingsSubmitting(true);
+    try {
+      const response = await apiPost('/api/eventmapping/request', {
+        sportType: emSportType.trim(),
+        leagueName: emLeagueName.trim() || null,
+        releaseNames: emReleaseNames.split(',').map(n => n.trim()).filter(n => n),
+        reason: emReason.trim() || null,
+        exampleRelease: emExampleRelease.trim() || null,
+      });
+
+      if (response.ok) {
+        const result: EventMappingSubmitResult = await response.json();
+
+        if (result.success) {
+          toast.success('Request Submitted', {
+            description: result.message,
+            duration: 8000,
+          });
+          setEmSelectedLeague(null);
+          setEmLeagueSearch('');
+          setEmSportType('');
+          setEmLeagueName('');
+          setEmReleaseNames('');
+          setEmReason('');
+          setEmExampleRelease('');
+          setShowEventMappingSubmitForm(false);
+        } else {
+          toast.error('Submission Failed', {
+            description: result.message,
+          });
+        }
+      } else {
+        const errorText = await response.text();
+        toast.error('Submission Failed', {
+          description: errorText || 'Failed to submit mapping request',
+        });
+      }
+    } catch (error) {
+      console.error('Submit failed:', error);
+      toast.error('Submission Failed', {
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+      });
+    } finally {
+      setEventMappingsSubmitting(false);
+    }
+  };
+
+  const getEventMappingSourceBadge = (source: string) => {
+    switch (source) {
+      case 'local':
+        return <span className="px-2 py-0.5 bg-blue-600/20 text-blue-400 text-xs rounded">Local Override</span>;
+      case 'admin':
+        return <span className="px-2 py-0.5 bg-purple-600/20 text-purple-400 text-xs rounded">Official</span>;
+      case 'community':
+      default:
+        return <span className="px-2 py-0.5 bg-green-600/20 text-green-400 text-xs rounded">Community</span>;
+    }
+  };
 
   const handleApplyFilePreset = (presetKey: string) => {
     if (!namingPresets?.file?.[presetKey]) return;
@@ -773,6 +991,432 @@ export default function MediaManagementSettings({ showAdvanced: propShowAdvanced
                   />
                 </div>
               </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Event Mappings (Advanced) */}
+      {showAdvanced && (
+        <div className="mb-8 bg-gradient-to-br from-gray-900 to-black border border-red-900/30 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center">
+              <MapIcon className="w-6 h-6 text-red-400 mr-3" />
+              <h3 className="text-xl font-semibold text-white">
+                Event Mappings
+                <span className="ml-2 px-2 py-0.5 bg-yellow-900/30 text-yellow-400 text-xs rounded">
+                  Advanced
+                </span>
+              </h3>
+            </div>
+          </div>
+
+          {/* Info Banner */}
+          <div className="mb-4 p-3 bg-blue-900/20 border border-blue-900/30 rounded-lg">
+            <p className="text-blue-300 text-sm">
+              <strong>Event Mappings</strong> help Sportarr match release names (like "Formula1", "F1", "UFC") to official
+              database names. Mappings sync automatically every 12 hours from the community-maintained Sportarr API.
+            </p>
+          </div>
+
+          {/* Sync Controls */}
+          <div className="mb-4 p-4 bg-black/30 rounded-lg">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-white font-medium">Sync Mappings</p>
+                <p className="text-gray-400 text-sm">
+                  Mappings auto-sync every 12 hours. Manual sync is available below.
+                </p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleEventMappingSync(false)}
+                  disabled={eventMappingsSyncing}
+                  className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors flex items-center space-x-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {eventMappingsSyncing ? (
+                    <>
+                      <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                      <span>Syncing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ArrowPathIcon className="w-4 h-4" />
+                      <span>Sync Updates</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => handleEventMappingSync(true)}
+                  disabled={eventMappingsSyncing}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-colors flex items-center space-x-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ArrowPathIcon className="w-4 h-4" />
+                  <span>Full Sync</span>
+                </button>
+              </div>
+            </div>
+
+            {lastEventMappingSyncResult && (
+              <div className={`p-2 rounded text-sm ${lastEventMappingSyncResult.success ? 'bg-green-900/20 border border-green-900/30' : 'bg-yellow-900/20 border border-yellow-900/30'}`}>
+                <div className="flex items-center space-x-3">
+                  {lastEventMappingSyncResult.success ? (
+                    <CheckCircleIcon className="w-4 h-4 text-green-400" />
+                  ) : (
+                    <XCircleIcon className="w-4 h-4 text-yellow-400" />
+                  )}
+                  <span className={lastEventMappingSyncResult.success ? 'text-green-300' : 'text-yellow-300'}>
+                    Added: {lastEventMappingSyncResult.added} | Updated: {lastEventMappingSyncResult.updated} | Unchanged: {lastEventMappingSyncResult.unchanged}
+                  </span>
+                  <span className="text-gray-500 text-xs">
+                    ({(lastEventMappingSyncResult.duration / 1000).toFixed(1)}s)
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Request New Mapping */}
+          <div className="mb-4 p-4 bg-black/30 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center">
+                <CloudArrowUpIcon className="w-5 h-5 text-green-400 mr-2" />
+                <span className="text-white font-medium">Request New Mapping</span>
+              </div>
+              {!showEventMappingSubmitForm && (
+                <button
+                  onClick={() => setShowEventMappingSubmitForm(true)}
+                  className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors flex items-center space-x-1.5"
+                >
+                  <PlusIcon className="w-4 h-4" />
+                  <span>New Request</span>
+                </button>
+              )}
+            </div>
+            <p className="text-gray-400 text-sm">
+              Missing a mapping? Submit a request to add it to the community database.
+            </p>
+
+            {showEventMappingSubmitForm && (
+              <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Form Section (2 columns on large screens) */}
+                <div className="lg:col-span-2 space-y-3">
+                  {/* League Selector */}
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-1">
+                      Select League <span className="text-gray-500">(from your library)</span>
+                    </label>
+                    {userLeagues.length > 0 ? (
+                      <div className="space-y-2">
+                        {/* Search Input */}
+                        <div className="relative">
+                          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <input
+                            type="text"
+                            value={emLeagueSearch}
+                            onChange={(e) => setEmLeagueSearch(e.target.value)}
+                            className="w-full pl-9 pr-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600"
+                            placeholder="Search leagues..."
+                          />
+                        </div>
+                        {/* League Grid */}
+                        <div className="max-h-32 overflow-y-auto border border-gray-700 rounded-lg bg-gray-900/50">
+                          {filteredLeagues.length === 0 ? (
+                            <p className="text-gray-500 text-sm p-3 text-center">No leagues found</p>
+                          ) : (
+                            <div className="divide-y divide-gray-800">
+                              {filteredLeagues.slice(0, 6).map((league) => (
+                                <button
+                                  key={league.id}
+                                  onClick={() => {
+                                    setEmSelectedLeague(league);
+                                    setEmSportType(league.sportType);
+                                    setEmLeagueName(league.name);
+                                    setEmLeagueSearch('');
+                                  }}
+                                  className={`w-full flex items-center gap-2 p-2 text-left transition-colors ${
+                                    emSelectedLeague?.id === league.id
+                                      ? 'bg-red-600/20 border-l-2 border-l-red-600'
+                                      : 'hover:bg-gray-800'
+                                  }`}
+                                >
+                                  {league.badge && (
+                                    <img src={league.badge} alt="" className="w-6 h-6 object-contain" />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-white text-sm truncate">{league.name}</div>
+                                    <div className="text-gray-500 text-xs">{league.sportType}</div>
+                                  </div>
+                                  {emSelectedLeague?.id === league.id && (
+                                    <CheckIcon className="w-4 h-4 text-red-400 flex-shrink-0" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {emSelectedLeague && (
+                          <div className="flex items-center gap-2 p-2 bg-red-900/20 border border-red-900/30 rounded-lg">
+                            <CheckCircleIcon className="w-4 h-4 text-green-400" />
+                            <span className="text-green-300 text-sm">Selected: {emSelectedLeague.name}</span>
+                            <button
+                              onClick={() => {
+                                setEmSelectedLeague(null);
+                                setEmSportType('');
+                                setEmLeagueName('');
+                              }}
+                              className="ml-auto text-gray-400 hover:text-white"
+                            >
+                              <XMarkIcon className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 text-sm p-2 bg-gray-800 rounded-lg">
+                        No leagues in your library. Add leagues first, or manually enter details below.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Manual Entry / Override */}
+                  <div className="pt-2 border-t border-gray-800">
+                    <p className="text-gray-500 text-xs mb-2">
+                      {emSelectedLeague ? 'Override auto-filled values if needed:' : 'Or enter details manually:'}
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-white text-sm font-medium mb-1">
+                          Sport Type <span className="text-red-400">*</span>
+                        </label>
+                        <select
+                          value={emSportType}
+                          onChange={(e) => setEmSportType(e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600"
+                        >
+                          <option value="">Select sport type...</option>
+                          {SPORT_TYPES.map((sport) => (
+                            <option key={sport} value={sport}>{sport}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-white text-sm font-medium mb-1">League Name</label>
+                        <input
+                          type="text"
+                          value={emLeagueName}
+                          onChange={(e) => setEmLeagueName(e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600"
+                          placeholder="e.g., Formula 1, UFC"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-1">
+                      Release Names <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={emReleaseNames}
+                      onChange={(e) => setEmReleaseNames(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600"
+                      placeholder="Comma-separated: Formula1, F1, Formula.1"
+                    />
+                    <p className="text-gray-500 text-xs mt-1">
+                      Common variations of how this league appears in release names
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-1">Example Release</label>
+                    <input
+                      type="text"
+                      value={emExampleRelease}
+                      onChange={(e) => setEmExampleRelease(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600"
+                      placeholder="e.g., Formula1.2024.Round.23.Abu.Dhabi.Grand.Prix.Race.1080p"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-1">Reason / Notes</label>
+                    <textarea
+                      value={emReason}
+                      onChange={(e) => setEmReason(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600 h-16 resize-none"
+                      placeholder="Why is this mapping needed?"
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-2">
+                    <button
+                      onClick={() => {
+                        setShowEventMappingSubmitForm(false);
+                        setEmSelectedLeague(null);
+                        setEmLeagueSearch('');
+                        setEmSportType('');
+                        setEmLeagueName('');
+                        setEmReleaseNames('');
+                        setEmReason('');
+                        setEmExampleRelease('');
+                      }}
+                      className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleEventMappingSubmitRequest}
+                      disabled={eventMappingsSubmitting || !emSportType.trim() || !emReleaseNames.trim()}
+                      className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors flex items-center space-x-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {eventMappingsSubmitting ? (
+                        <>
+                          <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                          <span>Submitting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CloudArrowUpIcon className="w-4 h-4" />
+                          <span>Submit</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Example Section (1 column on large screens) */}
+                <div className="lg:col-span-1">
+                  <div className="p-3 bg-blue-900/20 border border-blue-900/30 rounded-lg">
+                    <h4 className="text-blue-300 text-sm font-medium mb-2 flex items-center">
+                      <MapIcon className="w-4 h-4 mr-1.5" />
+                      Example Mapping
+                    </h4>
+                    <div className="space-y-2 text-xs">
+                      <div className="p-2 bg-black/30 rounded">
+                        <div className="text-gray-400 mb-1">Sport Type:</div>
+                        <div className="text-white font-mono">Motorsport</div>
+                      </div>
+                      <div className="p-2 bg-black/30 rounded">
+                        <div className="text-gray-400 mb-1">League Name:</div>
+                        <div className="text-white font-mono">Formula 1</div>
+                      </div>
+                      <div className="p-2 bg-black/30 rounded">
+                        <div className="text-gray-400 mb-1">Release Names:</div>
+                        <div className="text-white font-mono">Formula1, F1, Formula.1, Formula.One</div>
+                      </div>
+                      <div className="p-2 bg-black/30 rounded">
+                        <div className="text-gray-400 mb-1">Example Release:</div>
+                        <div className="text-white font-mono text-[10px] break-all">
+                          Formula1.2024.Round.23.Abu.Dhabi.Grand.Prix.Race.1080p.WEB-DL
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-gray-500 text-xs mt-3">
+                      Release names are the variations used in torrent/usenet releases.
+                      They help Sportarr match releases to the correct league.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Current Mappings List */}
+          <div className="p-4 bg-black/30 rounded-lg">
+            <div className="flex items-center mb-3">
+              <MapIcon className="w-5 h-5 text-red-400 mr-2" />
+              <span className="text-white font-medium">Current Mappings</span>
+              <span className="ml-2 px-2 py-0.5 bg-gray-700 text-gray-300 text-xs rounded">
+                {eventMappings.length} total
+              </span>
+            </div>
+
+            {eventMappingsLoading ? (
+              <div className="text-center py-4">
+                <ArrowPathIcon className="w-6 h-6 text-gray-500 animate-spin mx-auto mb-2" />
+                <p className="text-gray-500 text-sm">Loading mappings...</p>
+              </div>
+            ) : eventMappings.length === 0 ? (
+              <div className="text-center py-4">
+                <MapIcon className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                <p className="text-gray-500 text-sm mb-1">No event mappings configured</p>
+                <p className="text-gray-600 text-xs">
+                  Mappings will sync automatically, or click "Sync Updates" above
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-gray-900">
+                    <tr className="text-left text-gray-400 text-xs border-b border-gray-800">
+                      <th className="pb-2 pr-3">Sport / League</th>
+                      <th className="pb-2 pr-3">Release Names</th>
+                      <th className="pb-2 pr-3">Source</th>
+                      <th className="pb-2 pr-3">Status</th>
+                      <th className="pb-2">Last Synced</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800">
+                    {eventMappings.slice(0, 10).map((mapping) => (
+                      <tr key={mapping.id} className="text-xs">
+                        <td className="py-2 pr-3">
+                          <div className="text-white">{mapping.sportType}</div>
+                          {mapping.leagueName && (
+                            <div className="text-gray-500 text-xs">{mapping.leagueName}</div>
+                          )}
+                        </td>
+                        <td className="py-2 pr-3">
+                          <div className="flex flex-wrap gap-1">
+                            {mapping.releaseNames.slice(0, 2).map((name, idx) => (
+                              <span key={idx} className="px-1.5 py-0.5 bg-gray-800 text-gray-300 text-xs rounded">
+                                {name}
+                              </span>
+                            ))}
+                            {mapping.releaseNames.length > 2 && (
+                              <span className="px-1.5 py-0.5 bg-gray-700 text-gray-400 text-xs rounded">
+                                +{mapping.releaseNames.length - 2}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2 pr-3">
+                          {getEventMappingSourceBadge(mapping.source)}
+                        </td>
+                        <td className="py-2 pr-3">
+                          {mapping.isActive ? (
+                            <span className="flex items-center text-green-400">
+                              <CheckCircleIcon className="w-3.5 h-3.5 mr-1" />
+                              Active
+                            </span>
+                          ) : (
+                            <span className="flex items-center text-gray-500">
+                              <XCircleIcon className="w-3.5 h-3.5 mr-1" />
+                              Inactive
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 text-gray-500">
+                          {mapping.lastSyncedAt ? (
+                            <span className="flex items-center">
+                              <ClockIcon className="w-3 h-3 mr-1" />
+                              {new Date(mapping.lastSyncedAt).toLocaleDateString()}
+                            </span>
+                          ) : (
+                            <span className="text-gray-600">Never</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {eventMappings.length > 10 && (
+                  <p className="text-center text-gray-500 text-xs mt-2">
+                    Showing 10 of {eventMappings.length} mappings
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </div>
