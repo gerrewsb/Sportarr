@@ -396,26 +396,52 @@ public class DvrAutoSchedulerService : BackgroundService
 
         // Try to find a match based on team names or event title
         var searchTerms = new List<string>();
+        var hasTeamNames = false;
 
         // Add team names as search terms
         if (!string.IsNullOrEmpty(evt.HomeTeamName))
+        {
             searchTerms.Add(NormalizeForSearch(evt.HomeTeamName));
+            hasTeamNames = true;
+        }
         if (!string.IsNullOrEmpty(evt.AwayTeamName))
+        {
             searchTerms.Add(NormalizeForSearch(evt.AwayTeamName));
+            hasTeamNames = true;
+        }
 
         // Also extract team names from the event title if structured like "Team A vs Team B"
         var titleParts = evt.Title.Split(new[] { " vs ", " v ", " @ ", " at " }, StringSplitOptions.RemoveEmptyEntries);
-        foreach (var part in titleParts)
+        if (titleParts.Length > 1)
         {
-            var normalized = NormalizeForSearch(part);
-            if (!string.IsNullOrEmpty(normalized) && !searchTerms.Contains(normalized))
-                searchTerms.Add(normalized);
+            // Title has team separators, so these are likely team names
+            foreach (var part in titleParts)
+            {
+                var normalized = NormalizeForSearch(part);
+                if (!string.IsNullOrEmpty(normalized) && !searchTerms.Contains(normalized))
+                    searchTerms.Add(normalized);
+            }
+            hasTeamNames = true;
         }
 
-        if (searchTerms.Count == 0)
+        // For events without team names (UFC 310, F1 Monaco GP, etc.)
+        // Add the full title and key parts for matching
+        var normalizedTitle = NormalizeForSearch(evt.Title);
+        if (!hasTeamNames)
         {
-            // If no specific terms, try matching the full title
-            searchTerms.Add(NormalizeForSearch(evt.Title));
+            // Add the full event title
+            searchTerms.Add(normalizedTitle);
+
+            // Also add individual significant words from the title (e.g., "UFC", "310", "Monaco", "GP")
+            // This helps match EPG entries like "UFC 310" when searching for "ufc" and "310"
+            var titleWords = normalizedTitle.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Where(w => w.Length >= 2) // Skip very short words
+                .ToList();
+            foreach (var word in titleWords)
+            {
+                if (!searchTerms.Contains(word))
+                    searchTerms.Add(word);
+            }
         }
 
         // Score each candidate program
@@ -440,7 +466,7 @@ public class DvrAutoSchedulerService : BackgroundService
 
             var score = 0;
 
-            // Score based on matching search terms (team names)
+            // Score based on matching search terms (team names or title keywords)
             var matchedTerms = 0;
             foreach (var term in searchTerms)
             {
@@ -451,17 +477,45 @@ public class DvrAutoSchedulerService : BackgroundService
                 }
             }
 
-            // REQUIRE at least one team name match for sports events
-            // This prevents generic "Live Sports" programs from matching random events
-            if (matchedTerms == 0)
+            // Different matching requirements for team vs non-team events
+            if (hasTeamNames)
             {
-                continue;
-            }
+                // For team-based events (NHL, NBA, etc.), require at least one team name match
+                if (matchedTerms == 0)
+                {
+                    continue;
+                }
 
-            // Bonus for matching BOTH teams (much higher confidence)
-            if (matchedTerms >= 2)
+                // Bonus for matching BOTH teams (much higher confidence)
+                if (matchedTerms >= 2)
+                {
+                    score += 40; // Big bonus for matching both teams
+                }
+            }
+            else
             {
-                score += 40; // Big bonus for matching both teams
+                // For non-team events (UFC, F1, etc.), require either:
+                // 1. Full title match, OR
+                // 2. League name + event number/identifier match
+                var fullTitleMatch = normalizedProgramTitle.Contains(normalizedTitle);
+                var leagueAndEventMatch = !string.IsNullOrEmpty(leagueName) &&
+                    normalizedProgramTitle.Contains(leagueName) && matchedTerms >= 2;
+
+                if (!fullTitleMatch && !leagueAndEventMatch && matchedTerms < 2)
+                {
+                    // Not enough confidence for non-team events
+                    continue;
+                }
+
+                // Bonus for full title match on non-team events
+                if (fullTitleMatch)
+                {
+                    score += 50; // Strong match for exact title
+                }
+                else if (leagueAndEventMatch)
+                {
+                    score += 30; // Good match for league + identifier
+                }
             }
 
             // Bonus if EPG category/description matches the sport type
