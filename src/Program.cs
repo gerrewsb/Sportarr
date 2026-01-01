@@ -1547,6 +1547,57 @@ app.MapGet("/api/system/agents/jellyfin/download", async (HttpContext context, I
     }
 });
 
+app.MapGet("/api/system/agents/emby/download", async (HttpContext context, ILogger<Program> logger) =>
+{
+    // Try config directory first, then fall back to app directory
+    var embyAgentPath = Path.Combine(dataPath, "agents", "emby");
+    logger.LogInformation("Checking for Emby agent at: {Path}", embyAgentPath);
+
+    if (!Directory.Exists(embyAgentPath))
+    {
+        embyAgentPath = Path.Combine(AppContext.BaseDirectory, "agents", "emby");
+        logger.LogInformation("Not found, checking fallback at: {Path}", embyAgentPath);
+    }
+
+    if (!Directory.Exists(embyAgentPath))
+    {
+        logger.LogWarning("Emby agent not found at either location");
+        context.Response.StatusCode = 404;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsync("{\"error\":\"Emby agent not found. The agents folder may not be included in your build.\"}");
+        return;
+    }
+
+    try
+    {
+        logger.LogInformation("Creating zip from: {Path}", embyAgentPath);
+
+        // Create a zip file in memory
+        using var memoryStream = new MemoryStream();
+        using (var archive = new System.IO.Compression.ZipArchive(memoryStream, System.IO.Compression.ZipArchiveMode.Create, true))
+        {
+            await AddDirectoryToZip(archive, embyAgentPath, "emby");
+        }
+
+        memoryStream.Position = 0;
+        var bytes = memoryStream.ToArray();
+
+        logger.LogInformation("Zip created successfully, size: {Size} bytes", bytes.Length);
+
+        context.Response.ContentType = "application/zip";
+        context.Response.Headers.Append("Content-Disposition", "attachment; filename=\"Sportarr-Emby.zip\"");
+        context.Response.Headers.Append("Content-Length", bytes.Length.ToString());
+        await context.Response.Body.WriteAsync(bytes);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Failed to create Emby agent zip");
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsync($"{{\"error\":\"Failed to create zip: {ex.Message}\"}}");
+    }
+});
+
 // Helper function to add a directory to a zip archive
 static async Task AddDirectoryToZip(System.IO.Compression.ZipArchive archive, string sourceDir, string entryPrefix)
 {

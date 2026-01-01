@@ -416,7 +416,7 @@ export default function GeneralSettings({ showAdvanced = false }: GeneralSetting
         saveButtonText={saving ? 'Saving...' : 'Save Changes'}
       />
 
-      <div className="max-w-4xl mx-auto px-6">
+      <div className="max-w-6xl mx-auto px-6">
 
       {/* Host */}
       <div className="mb-8 bg-gradient-to-br from-gray-900 to-black border border-red-900/30 rounded-lg p-6">
@@ -948,7 +948,7 @@ export default function GeneralSettings({ showAdvanced = false }: GeneralSetting
           Download metadata agents for your media server. These agents fetch sports metadata (posters, banners, descriptions) from sportarr.net.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Plex - New Custom Provider */}
           <div className="p-4 bg-black/30 rounded-lg border border-gray-800 flex flex-col">
             <div className="flex items-center justify-between mb-2">
@@ -985,14 +985,14 @@ export default function GeneralSettings({ showAdvanced = false }: GeneralSetting
                 <ClipboardDocumentIcon className="w-4 h-4" />
               </button>
             </div>
-            <div className="text-gray-400 text-xs mb-3 space-y-1">
+            <div className="text-gray-400 text-xs mb-3 space-y-1 flex-1">
               <p><strong className="text-gray-300">Setup:</strong></p>
               <p>1. Settings → Metadata Agents → + Add Provider</p>
               <p>2. Paste URL above → + Add Agent → Name it → Save</p>
               <p>3. Restart Plex</p>
               <p>4. Create TV Shows library with Sportarr agent</p>
             </div>
-            <details className="text-xs">
+            <details className="text-xs mt-auto">
               <summary className="text-gray-500 cursor-pointer hover:text-gray-400 mb-2">
                 Legacy agent for older Plex versions
               </summary>
@@ -1015,16 +1015,48 @@ export default function GeneralSettings({ showAdvanced = false }: GeneralSetting
             <div className="flex items-center justify-between mb-2">
               <span className="text-white font-medium">Jellyfin</span>
             </div>
-            <p className="text-gray-400 text-xs mb-3 flex-1">
-              Build the plugin or copy the DLL to your Jellyfin plugins directory. Create a Shows library and enable Sportarr metadata.
+            <p className="text-gray-400 text-xs mb-3">
+              Install the Sportarr plugin for automatic sports metadata.
             </p>
+            <div className="text-gray-400 text-xs mb-3 space-y-1 flex-1">
+              <p><strong className="text-gray-300">Setup:</strong></p>
+              <p>1. Download and extract the plugin ZIP</p>
+              <p>2. Copy the DLL to your Jellyfin plugins directory</p>
+              <p>3. Restart Jellyfin</p>
+              <p>4. Create a Shows library and enable Sportarr metadata</p>
+            </div>
             <a
               href="/api/system/agents/jellyfin/download"
               download="Sportarr-Jellyfin.zip"
-              className="inline-flex items-center px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors w-fit"
+              className="inline-flex items-center px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors w-fit mt-auto"
             >
               <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
-              Download Jellyfin Agent
+              Download Jellyfin Plugin
+            </a>
+          </div>
+
+          {/* Emby Agent */}
+          <div className="p-4 bg-black/30 rounded-lg border border-gray-800 flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-white font-medium">Emby</span>
+            </div>
+            <p className="text-gray-400 text-xs mb-3">
+              Install the Sportarr plugin for automatic sports metadata.
+            </p>
+            <div className="text-gray-400 text-xs mb-3 space-y-1 flex-1">
+              <p><strong className="text-gray-300">Setup:</strong></p>
+              <p>1. Download and extract the plugin ZIP</p>
+              <p>2. Copy the DLL to your Emby plugins directory</p>
+              <p>3. Restart Emby</p>
+              <p>4. Create a Shows library and enable Sportarr metadata</p>
+            </div>
+            <a
+              href="/api/system/agents/emby/download"
+              download="Sportarr-Emby.zip"
+              className="inline-flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors w-fit mt-auto"
+            >
+              <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
+              Download Emby Plugin
             </a>
           </div>
         </div>
