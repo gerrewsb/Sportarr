@@ -1035,7 +1035,9 @@ export default function ManualSearchModal({
                                           <span className="text-[9px] text-orange-400 truncate max-w-[90px]">
                                             {mismatchWarnings.length === 1 ? mismatchWarnings[0].split(':')[0] : `${mismatchWarnings.length} warnings`}
                                           </span>
-                                          <div className="absolute left-0 top-4 z-50 hidden group-hover:block w-64 p-2 bg-gray-900 border border-gray-700 rounded-lg shadow-xl text-left">
+                                          <div className={`absolute left-0 z-50 hidden group-hover:block w-64 p-2 bg-gray-900 border border-gray-700 rounded-lg shadow-xl text-left ${
+                                            index >= sortedResults.length / 2 ? 'bottom-4' : 'top-4'
+                                          }`}>
                                             <p className="text-orange-400 text-[10px] font-semibold mb-1">Quality Mismatch:</p>
                                             {mismatchWarnings.map((w, i) => (
                                               <p key={i} className="text-gray-400 text-[10px]">• {w}</p>
@@ -1057,7 +1059,9 @@ export default function ManualSearchModal({
                                         {result.customFormatScore > 0 ? '+' : ''}{result.customFormatScore}
                                       </span>
                                       {getFilteredFormats(result.matchedFormats).length > 0 && (
-                                        <div className="absolute right-0 top-5 z-50 hidden group-hover:block p-1.5 bg-gray-900 border border-gray-700 rounded-lg shadow-xl">
+                                        <div className={`absolute right-0 z-50 hidden group-hover:block p-1.5 bg-gray-900 border border-gray-700 rounded-lg shadow-xl ${
+                                          index >= sortedResults.length / 2 ? 'bottom-5' : 'top-5'
+                                        }`}>
                                           <div className="flex flex-wrap gap-0.5 max-w-[200px]">
                                             {getFilteredFormats(result.matchedFormats).map((format, fIdx) => (
                                               <span
@@ -1086,7 +1090,10 @@ export default function ManualSearchModal({
                                             result.isBlocklisted ? 'text-orange-400' : 'text-red-400'
                                           }`}
                                         />
-                                        <div className="absolute right-0 top-5 z-50 hidden group-hover:block w-64 p-2 bg-gray-900 border border-gray-700 rounded-lg shadow-xl text-left">
+                                        {/* Tooltip shows above for items in bottom half of list to prevent clipping */}
+                                        <div className={`absolute right-0 z-50 hidden group-hover:block w-64 p-2 bg-gray-900 border border-gray-700 rounded-lg shadow-xl text-left ${
+                                          index >= sortedResults.length / 2 ? 'bottom-5' : 'top-5'
+                                        }`}>
                                           {result.isBlocklisted && (
                                             <div className="mb-1.5">
                                               <p className="text-orange-400 text-[10px] font-semibold">Blocklisted</p>
