@@ -315,33 +315,17 @@ public class ReleaseMatchScorer
         // Check home team (20 points max)
         if (!string.IsNullOrEmpty(evt.HomeTeamName))
         {
-            var homeWords = NormalizeTitle(evt.HomeTeamName)
-                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .Where(w => w.Length > 2 && !IsCommonWord(w))
-                .ToList();
-
-            var homeMatches = homeWords.Count(w => normalizedRelease.Contains(w, StringComparison.OrdinalIgnoreCase));
-            if (homeWords.Count > 0 && homeMatches > 0)
-            {
-                homeHasMatch = true;
-                homeScore = (int)(20.0 * homeMatches / homeWords.Count);
-            }
+            var (hasMatch, score) = CheckTeamMatch(normalizedRelease, evt.HomeTeamName);
+            homeHasMatch = hasMatch;
+            homeScore = score;
         }
 
         // Check away team (20 points max)
         if (!string.IsNullOrEmpty(evt.AwayTeamName))
         {
-            var awayWords = NormalizeTitle(evt.AwayTeamName)
-                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .Where(w => w.Length > 2 && !IsCommonWord(w))
-                .ToList();
-
-            var awayMatches = awayWords.Count(w => normalizedRelease.Contains(w, StringComparison.OrdinalIgnoreCase));
-            if (awayWords.Count > 0 && awayMatches > 0)
-            {
-                awayHasMatch = true;
-                awayScore = (int)(20.0 * awayMatches / awayWords.Count);
-            }
+            var (hasMatch, score) = CheckTeamMatch(normalizedRelease, evt.AwayTeamName);
+            awayHasMatch = hasMatch;
+            awayScore = score;
         }
 
         // Check if this looks like a game release (has "vs", "@", "at", or team matchup indicators)
@@ -613,6 +597,80 @@ public class ReleaseMatchScorer
             "vs", "versus", "grand", "prix", "race", "match", "game", "event"
         };
         return commonWords.Contains(word);
+    }
+
+    /// <summary>
+    /// Check if a team name matches in a release title.
+    /// Returns (hasMatch, score) where hasMatch requires MAJORITY of significant words to match.
+    /// This prevents "New Orleans Saints" from matching "New York Jets" just because "New" matches.
+    ///
+    /// Matching rules:
+    /// 1. Team nickname (last word, e.g., "Saints", "Dolphins", "Jets") MUST match
+    /// 2. OR at least 50% of all significant words must match
+    /// 3. Single common city prefix words (New, Los, San) don't count as matches alone
+    /// </summary>
+    private (bool hasMatch, int score) CheckTeamMatch(string normalizedRelease, string teamName)
+    {
+        var teamWords = NormalizeTitle(teamName)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => w.Length > 2 && !IsCommonWord(w))
+            .ToList();
+
+        if (teamWords.Count == 0)
+            return (false, 0);
+
+        // Common city prefix words that shouldn't count as a match alone
+        var cityPrefixes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "new", "los", "san", "las", "st", "saint"
+        };
+
+        var matchedWords = teamWords
+            .Where(w => normalizedRelease.Contains(w, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (matchedWords.Count == 0)
+            return (false, 0);
+
+        // Get the team nickname (typically the last word - "Saints", "Dolphins", "Jets", "Chiefs")
+        var teamNickname = teamWords.Last();
+        var nicknameMatches = normalizedRelease.Contains(teamNickname, StringComparison.OrdinalIgnoreCase);
+
+        // Calculate match percentage
+        var matchPercentage = (double)matchedWords.Count / teamWords.Count;
+
+        // Determine if this is a real match:
+        // 1. Team nickname must match, OR
+        // 2. At least 50% of significant words must match
+        // 3. But if ONLY city prefix words match (like just "New"), it's NOT a match
+        var onlyCityPrefixesMatch = matchedWords.All(w => cityPrefixes.Contains(w));
+
+        bool hasMatch;
+        if (onlyCityPrefixesMatch)
+        {
+            // Only matched words like "New", "Los", "San" - not a real team match
+            hasMatch = false;
+        }
+        else if (nicknameMatches)
+        {
+            // Nickname matches - definitely the right team
+            hasMatch = true;
+        }
+        else if (matchPercentage >= 0.5)
+        {
+            // At least half the significant words match
+            hasMatch = true;
+        }
+        else
+        {
+            // Not enough evidence this is the right team
+            hasMatch = false;
+        }
+
+        // Score based on match percentage (max 20 points)
+        var score = hasMatch ? (int)(20.0 * matchPercentage) : 0;
+
+        return (hasMatch, score);
     }
 
     #endregion
