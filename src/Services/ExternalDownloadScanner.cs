@@ -199,6 +199,23 @@ public class ExternalDownloadScanner
             return;
         }
 
+        // Also check for imported downloads by title - this handles cases where:
+        // 1. SABnzbd history returns a different nzo_id format than what was stored
+        // 2. The download was already successfully imported but is still in SABnzbd history
+        // Without this check, imported downloads would be re-detected as "external" requiring import
+        var existingImportedByTitle = await _db.DownloadQueue
+            .Where(dq => dq.DownloadClientId == client.Id &&
+                        dq.Status == DownloadStatus.Imported)
+            .AnyAsync(dq => dq.Title == download.Title ||
+                           EF.Functions.Like(dq.Title, "%" + download.Title + "%") ||
+                           EF.Functions.Like(download.Title, "%" + dq.Title + "%"));
+
+        if (existingImportedByTitle)
+        {
+            _logger.LogDebug("[External Download Scanner] Skipping already-imported download (title match): {Title}", download.Title);
+            return;
+        }
+
         // Decypharr compatibility: Check by title match for active/recent downloads
         // Debrid proxies like Decypharr may report different hashes than what was originally stored
         var existingByTitle = await _db.DownloadQueue
