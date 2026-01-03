@@ -50,9 +50,15 @@ export default function LogFilesPage() {
   const handleDownload = async (filename: string) => {
     try {
       const urlBase = window.Sportarr?.urlBase || '';
+      const apiKey = window.Sportarr?.apiKey || '';
+
       // Use query parameter to avoid ASP.NET routing issues with dots in filenames
+      // Include X-Api-Key header for authentication
       const response = await fetch(`${urlBase}/api/log/file/download?filename=${encodeURIComponent(filename)}`, {
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'X-Api-Key': apiKey
+        }
       });
 
       if (!response.ok) {
