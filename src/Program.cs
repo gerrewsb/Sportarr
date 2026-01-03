@@ -273,6 +273,7 @@ builder.Services.AddScoped<Sportarr.Api.Services.IndexerStatusService>(); // Son
 builder.Services.AddScoped<Sportarr.Api.Services.IndexerSearchService>();
 builder.Services.AddScoped<Sportarr.Api.Services.ReleaseMatchingService>(); // Sonarr-style release validation to prevent downloading wrong content
 builder.Services.AddSingleton<Sportarr.Api.Services.ReleaseMatchScorer>(); // Match scoring for event-to-release matching
+builder.Services.AddScoped<Sportarr.Api.Services.ReleaseCacheService>(); // Local release cache for RSS-first search strategy
 builder.Services.AddSingleton<Sportarr.Api.Services.SearchQueueService>(); // Queue for parallel search execution
 builder.Services.AddSingleton<Sportarr.Api.Services.SearchResultCache>(); // In-memory cache for raw indexer results (reduces API calls)
 builder.Services.AddSingleton<Sportarr.Api.Services.CustomFormatMatchCache>(); // In-memory cache for CF match results (avoids repeated regex evaluation)
