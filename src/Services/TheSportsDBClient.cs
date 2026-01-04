@@ -885,6 +885,7 @@ public class Country
 /// </summary>
 public class Season
 {
+    [JsonPropertyName("strSeason")]
     public string? StrSeason { get; set; }
 }
 
