@@ -21,6 +21,7 @@ public class AutomaticSearchService
     private readonly ReleaseCacheService _releaseCacheService;
     private readonly ReleaseMatchScorer _releaseMatchScorer;
     private readonly SearchResultCache _searchResultCache;
+    private readonly ReleaseEvaluator _releaseEvaluator;
     private readonly ILogger<AutomaticSearchService> _logger;
 
     // Concurrent event search limiting (Sonarr-style)
@@ -41,6 +42,7 @@ public class AutomaticSearchService
         ReleaseCacheService releaseCacheService,
         ReleaseMatchScorer releaseMatchScorer,
         SearchResultCache searchResultCache,
+        ReleaseEvaluator releaseEvaluator,
         ILogger<AutomaticSearchService> logger)
     {
         _db = db;
@@ -53,6 +55,7 @@ public class AutomaticSearchService
         _releaseCacheService = releaseCacheService;
         _releaseMatchScorer = releaseMatchScorer;
         _searchResultCache = searchResultCache;
+        _releaseEvaluator = releaseEvaluator;
         _logger = logger;
     }
 
@@ -211,6 +214,11 @@ public class AutomaticSearchService
                     usedCache = true;
                     _logger.LogInformation("[Automatic Search] Using cached results for query '{Query}' ({Count} releases, cache valid for {Duration}s)",
                         primaryQuery, allReleases.Count, config.SearchCacheDuration);
+
+                    // Re-evaluate cached releases against quality profile
+                    // Cached releases have Approved=true and empty Rejections by default
+                    // We must run ReleaseEvaluator to apply CF minimum score and other profile requirements
+                    await ReEvaluateCachedReleasesAsync(allReleases, qualityProfileId, part, evt.Sport, config.EnableMultiPartEpisodes, evt.Title);
                 }
             }
 
@@ -1124,6 +1132,83 @@ public class AutomaticSearchService
 
     // Private helper methods
 
+    /// <summary>
+    /// Re-evaluate cached releases against the current quality profile
+    /// Cached releases have Approved=true and empty Rejections - we need to apply
+    /// ReleaseEvaluator logic to enforce CF minimum scores, size limits, etc.
+    /// </summary>
+    private async Task ReEvaluateCachedReleasesAsync(
+        List<ReleaseSearchResult> releases,
+        int? qualityProfileId,
+        string? requestedPart,
+        string? sport,
+        bool enableMultiPartEpisodes,
+        string? eventTitle)
+    {
+        if (!releases.Any()) return;
+
+        // Load profile and custom formats
+        QualityProfile? profile = null;
+        List<CustomFormat>? customFormats = null;
+        List<QualityDefinition>? qualityDefinitions = null;
+
+        if (qualityProfileId.HasValue)
+        {
+            profile = await _db.QualityProfiles
+                .FirstOrDefaultAsync(p => p.Id == qualityProfileId.Value);
+            customFormats = await _db.CustomFormats.ToListAsync();
+        }
+
+        qualityDefinitions = await _db.QualityDefinitions.ToListAsync();
+
+        if (profile == null)
+        {
+            _logger.LogDebug("[Automatic Search] No quality profile for cached release evaluation");
+            return;
+        }
+
+        _logger.LogDebug("[Automatic Search] Re-evaluating {Count} cached releases against profile '{Profile}'",
+            releases.Count, profile.Name);
+
+        int rejectedCount = 0;
+        foreach (var release in releases)
+        {
+            var isPack = release.IsPack;
+
+            var evaluation = _releaseEvaluator.EvaluateRelease(
+                release,
+                profile,
+                customFormats,
+                qualityDefinitions,
+                requestedPart,
+                sport,
+                enableMultiPartEpisodes,
+                eventTitle,
+                null,
+                isPack);
+
+            // Update release with evaluation results
+            release.Score = evaluation.TotalScore;
+            release.QualityScore = evaluation.QualityScore;
+            release.CustomFormatScore = evaluation.CustomFormatScore;
+            release.SizeScore = evaluation.SizeScore;
+            release.Approved = evaluation.Approved;
+            release.Rejections = evaluation.Rejections;
+            release.MatchedFormats = evaluation.MatchedFormats;
+            release.Quality = evaluation.Quality;
+
+            if (evaluation.Rejections.Any())
+            {
+                rejectedCount++;
+            }
+        }
+
+        if (rejectedCount > 0)
+        {
+            _logger.LogInformation("[Automatic Search] Re-evaluation rejected {Count}/{Total} cached releases (CF score, size, etc.)",
+                rejectedCount, releases.Count);
+        }
+    }
 
     private async Task<DownloadClient?> GetPreferredDownloadClientAsync(string protocol)
     {

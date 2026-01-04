@@ -281,7 +281,7 @@ public class TheSportsDBClient
 
             var json = await response.Content.ReadAsStringAsync();
             var result = JsonSerializer.Deserialize<TheSportsDBSeasonsResponse>(json, _jsonOptions);
-            return result?.Data?.Seasons;
+            return result?.Seasons;
         }
         catch (Exception ex)
         {
@@ -305,7 +305,7 @@ public class TheSportsDBClient
 
             var json = await response.Content.ReadAsStringAsync();
             var result = JsonSerializer.Deserialize<TheSportsDBTeamsResponse>(json, _jsonOptions);
-            return result?.Data?.Teams;
+            return result?.Teams;
         }
         catch (Exception ex)
         {
@@ -872,37 +872,29 @@ public class Season
 
 /// <summary>
 /// Response wrapper for seasons list endpoint
+/// V2 API returns { list: [...] } directly (NOT wrapped in data object)
 /// </summary>
 public class TheSportsDBSeasonsResponse
 {
-    public SeasonsData? Data { get; set; }
-}
-
-/// <summary>
-/// Nested data object containing seasons list
-/// </summary>
-public class SeasonsData
-{
+    /// <summary>
+    /// V2 API returns seasons directly in "list" property
+    /// </summary>
     [JsonPropertyName("list")]
     public List<Season>? Seasons { get; set; }
 }
 
 /// <summary>
 /// Response wrapper for teams list endpoint
+/// V2 API returns { list: [...] } directly (NOT wrapped in data object)
 /// Endpoint: GET /api/v2/json/list/teams/{leagueId}
 /// </summary>
 public class TheSportsDBTeamsResponse
 {
-    public TeamsData? Data { get; set; }
-    public MetaData? _Meta { get; set; }
-}
-
-/// <summary>
-/// Nested data object containing teams list
-/// sportarr.net returns teams in "list" property
-/// </summary>
-public class TeamsData
-{
+    /// <summary>
+    /// V2 API returns teams directly in "list" property
+    /// </summary>
     [JsonPropertyName("list")]
     public List<Team>? Teams { get; set; }
+
+    public MetaData? _Meta { get; set; }
 }
