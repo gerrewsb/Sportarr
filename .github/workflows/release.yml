@@ -52,7 +52,7 @@ jobs:
 
           # Configure git
           git config user.name "Sportarr"
-          git config user.email "unmannedmediaplex@gmail.com"
+          git config user.email "sportarr@users.noreply.github.com"
 
           # Commit version bump with conventional commit format
           # IMPORTANT: Always use conventional commit prefix (chore/fix/feat/refactor)
