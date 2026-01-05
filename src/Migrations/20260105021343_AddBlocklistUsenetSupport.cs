@@ -18,9 +18,9 @@ namespace Sportarr.Migrations
                 nullable: true);
 
             // SQLite doesn't support ALTER COLUMN, so we need to recreate the table
-            // to make TorrentInfoHash nullable
+            // to make TorrentInfoHash nullable (required for Usenet which has no info hash)
             migrationBuilder.Sql(@"
-                -- Create temp table with new schema
+                -- Create temp table with new schema (TorrentInfoHash now nullable)
                 CREATE TABLE ""Blocklist_temp"" (
                     ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_Blocklist"" PRIMARY KEY AUTOINCREMENT,
                     ""EventId"" INTEGER NULL,
@@ -46,8 +46,10 @@ namespace Sportarr.Migrations
                 -- Rename temp table
                 ALTER TABLE ""Blocklist_temp"" RENAME TO ""Blocklist"";
 
-                -- Recreate index
+                -- Recreate indexes
+                CREATE INDEX ""IX_Blocklist_BlockedAt"" ON ""Blocklist"" (""BlockedAt"");
                 CREATE INDEX ""IX_Blocklist_EventId"" ON ""Blocklist"" (""EventId"");
+                CREATE INDEX ""IX_Blocklist_TorrentInfoHash"" ON ""Blocklist"" (""TorrentInfoHash"");
             ");
         }
 
@@ -70,7 +72,7 @@ namespace Sportarr.Migrations
                     CONSTRAINT ""FK_Blocklist_Events_EventId"" FOREIGN KEY (""EventId"") REFERENCES ""Events"" (""Id"") ON DELETE SET NULL
                 );
 
-                -- Copy data (only rows with TorrentInfoHash)
+                -- Copy data (only rows with TorrentInfoHash, use 'unknown' for nulls)
                 INSERT INTO ""Blocklist_temp"" (""Id"", ""EventId"", ""Title"", ""TorrentInfoHash"", ""Indexer"", ""Reason"", ""Message"", ""BlockedAt"", ""Part"")
                 SELECT ""Id"", ""EventId"", ""Title"", COALESCE(""TorrentInfoHash"", 'unknown'), ""Indexer"", ""Reason"", ""Message"", ""BlockedAt"", ""Part""
                 FROM ""Blocklist"";
@@ -81,8 +83,10 @@ namespace Sportarr.Migrations
                 -- Rename temp table
                 ALTER TABLE ""Blocklist_temp"" RENAME TO ""Blocklist"";
 
-                -- Recreate index
+                -- Recreate indexes
+                CREATE INDEX ""IX_Blocklist_BlockedAt"" ON ""Blocklist"" (""BlockedAt"");
                 CREATE INDEX ""IX_Blocklist_EventId"" ON ""Blocklist"" (""EventId"");
+                CREATE INDEX ""IX_Blocklist_TorrentInfoHash"" ON ""Blocklist"" (""TorrentInfoHash"");
             ");
         }
     }
