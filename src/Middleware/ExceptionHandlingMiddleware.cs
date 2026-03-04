@@ -129,15 +129,16 @@ public class ExceptionHandlingMiddleware
         }
 
         // Log the error with appropriate level
-        // Sanitize user-controlled path to prevent log injection attacks
+        // Sanitize user-controlled path and exception message to prevent log injection attacks (CWE-117)
         var sanitizedPath = SanitizeForLog(errorResponse.Path);
+        var sanitizedMessage = SanitizeForLog(exception.Message);
         if (errorResponse.StatusCode >= 500)
         {
             _logger.LogError(exception,
                 "[{ErrorId}] Server error on {Path}: {Message}",
                 errorResponse.ErrorId,
                 sanitizedPath,
-                exception.Message);
+                sanitizedMessage);
         }
         else if (errorResponse.StatusCode >= 400)
         {
@@ -145,27 +146,26 @@ public class ExceptionHandlingMiddleware
                 "[{ErrorId}] Client error on {Path}: {Message}",
                 errorResponse.ErrorId,
                 sanitizedPath,
-                exception.Message);
+                sanitizedMessage);
         }
 
         return errorResponse;
     }
 
     /// <summary>
-    /// Sanitize user-controlled input for logging to prevent log injection attacks.
-    /// Removes newlines, carriage returns, and other control characters that could
-    /// be used to forge log entries.
+    /// Sanitize user-controlled input for logging to prevent log injection attacks (CWE-117).
+    /// Strips all control characters and truncates to prevent log flooding.
     /// </summary>
-    private static string SanitizeForLog(string? input)
+    private static string SanitizeForLog(string? input, int maxLength = 512)
     {
         if (string.IsNullOrEmpty(input))
             return string.Empty;
 
-        // Replace control characters that could be used for log injection
-        return input
-            .Replace("\r", "")
-            .Replace("\n", "")
-            .Replace("\t", " ");
+        var sanitized = new string(input.Where(c => !char.IsControl(c)).ToArray());
+        if (sanitized.Length > maxLength)
+            sanitized = sanitized[..maxLength] + "...";
+
+        return sanitized;
     }
 }
 

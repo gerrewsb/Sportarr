@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Sportarr.Api.Services;
 
 namespace Sportarr.Api.Middleware;
@@ -46,7 +48,10 @@ public class AuthenticationMiddleware
             var apiKey = config.ApiKey;
             var providedKey = context.Request.Headers[API_KEY_HEADER].FirstOrDefault();
 
-            if (!string.IsNullOrEmpty(providedKey) && providedKey == apiKey)
+            if (!string.IsNullOrEmpty(providedKey) && !string.IsNullOrEmpty(apiKey) &&
+                CryptographicOperations.FixedTimeEquals(
+                    Encoding.UTF8.GetBytes(providedKey),
+                    Encoding.UTF8.GetBytes(apiKey)))
             {
                 // Valid API key
                 await _next(context);

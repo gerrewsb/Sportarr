@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
@@ -77,13 +79,13 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
             return AuthenticateResult.NoResult();
         }
 
-        // Validate API key
-        if (providedKey != apiKey)
+        // Validate API key using constant-time comparison to prevent timing attacks
+        var providedBytes = Encoding.UTF8.GetBytes(providedKey);
+        var expectedBytes = Encoding.UTF8.GetBytes(apiKey);
+        if (!CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes))
         {
             // Use Debug level to avoid log spam from external tools polling with wrong keys
-            // Sanitize user input to prevent log injection attacks
-            var sanitizedKeyPreview = SanitizeForLog(providedKey?.Substring(0, Math.Min(8, providedKey?.Length ?? 0)));
-            Logger.LogDebug("[API KEY AUTH] API key mismatch! Provided: {Provided}...", sanitizedKeyPreview);
+            Logger.LogDebug("[API KEY AUTH] API key mismatch");
             return AuthenticateResult.NoResult();
         }
 
@@ -114,17 +116,4 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
         return Task.CompletedTask;
     }
 
-    /// <summary>
-    /// Sanitize user-controlled input for logging to prevent log injection attacks.
-    /// </summary>
-    private static string SanitizeForLog(string? input)
-    {
-        if (string.IsNullOrEmpty(input))
-            return string.Empty;
-
-        return input
-            .Replace("\r", "")
-            .Replace("\n", "")
-            .Replace("\t", " ");
-    }
 }

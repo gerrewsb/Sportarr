@@ -27,9 +27,13 @@ public class DynamicAuthenticationMiddleware
         // Sanitize user-controlled values to prevent log injection attacks
         if (path.StartsWith("/api/v1/"))
         {
-            logger.LogInformation("[PROWLARR MIDDLEWARE] Request to {Path}", SanitizeForLog(path));
-            logger.LogInformation("[PROWLARR MIDDLEWARE] Headers: {Headers}",
-                string.Join(", ", context.Request.Headers.Select(h => $"{SanitizeForLog(h.Key)}={SanitizeForLog(h.Value)}")));
+            var sanitizedPath = SanitizeForLog(path);
+            logger.LogInformation("[PROWLARR MIDDLEWARE] Request to {Path}", sanitizedPath);
+            // Only log non-sensitive headers to prevent credential leakage
+            var safeHeaders = context.Request.Headers
+                .Where(h => !IsSensitiveHeader(h.Key))
+                .Select(h => $"{SanitizeForLog(h.Key)}={SanitizeForLog(h.Value)}");
+            logger.LogInformation("[PROWLARR MIDDLEWARE] Headers: {Headers}", string.Join(", ", safeHeaders));
         }
 
         // Allow public paths
@@ -280,17 +284,30 @@ public class DynamicAuthenticationMiddleware
     }
 
     /// <summary>
-    /// Sanitize user-controlled input for logging to prevent log injection attacks.
+    /// Sanitize user-controlled input for logging to prevent log injection attacks (CWE-117).
+    /// Strips all control characters and truncates to prevent log flooding.
     /// </summary>
-    private static string SanitizeForLog(string? input)
+    private static string SanitizeForLog(string? input, int maxLength = 256)
     {
         if (string.IsNullOrEmpty(input))
             return string.Empty;
 
-        return input
-            .Replace("\r", "")
-            .Replace("\n", "")
-            .Replace("\t", " ");
+        var sanitized = new string(input.Where(c => !char.IsControl(c)).ToArray());
+        if (sanitized.Length > maxLength)
+            sanitized = sanitized[..maxLength] + "...";
+
+        return sanitized;
+    }
+
+    /// <summary>
+    /// Returns true for headers that may contain credentials or secrets.
+    /// </summary>
+    private static bool IsSensitiveHeader(string headerName)
+    {
+        return headerName.Equals("Authorization", StringComparison.OrdinalIgnoreCase) ||
+               headerName.Equals("X-Api-Key", StringComparison.OrdinalIgnoreCase) ||
+               headerName.Equals("Cookie", StringComparison.OrdinalIgnoreCase) ||
+               headerName.Equals("Set-Cookie", StringComparison.OrdinalIgnoreCase);
     }
 }
 
