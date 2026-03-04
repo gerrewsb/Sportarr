@@ -1019,15 +1019,14 @@ export default function GeneralSettings({ showAdvanced = false }: GeneralSetting
               Install the Sportarr plugin for automatic sports metadata.
             </p>
             <div className="text-gray-400 text-xs mb-3 space-y-1 flex-1">
-              <p><strong className="text-gray-300">Setup:</strong></p>
-              <p>1. Download and extract the plugin ZIP</p>
-              <p>2. Copy the DLL to your Jellyfin plugins directory</p>
-              <p>3. Restart Jellyfin</p>
-              <p>4. Create a Shows library and enable Sportarr metadata</p>
+              <p><strong className="text-gray-300">Setup (Plugin Repository):</strong></p>
+              <p>1. Dashboard → Plugins → Repositories → Add</p>
+              <p>2. Name: <code className="bg-gray-800 px-1 rounded">Sportarr</code></p>
+              <p>3. URL: <code className="bg-gray-800 px-1 rounded text-[10px]">https://raw.githubusercontent.com/sportarr/Sportarr/main/agents/jellyfin/manifest.json</code></p>
+              <p>4. Catalog → Metadata → Install Sportarr → Restart Jellyfin</p>
             </div>
             <a
               href="/api/system/agents/jellyfin/download"
-              download="Sportarr-Jellyfin.zip"
               className="inline-flex items-center px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors w-fit mt-auto"
             >
               <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
@@ -1052,7 +1051,6 @@ export default function GeneralSettings({ showAdvanced = false }: GeneralSetting
             </div>
             <a
               href="/api/system/agents/emby/download"
-              download="Sportarr-Emby.zip"
               className="inline-flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors w-fit mt-auto"
             >
               <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
@@ -1062,7 +1060,7 @@ export default function GeneralSettings({ showAdvanced = false }: GeneralSetting
         </div>
 
         <p className="text-gray-500 text-xs mt-4">
-          Docker users: Agents are also available at <code className="bg-gray-800 px-1 rounded">/config/agents/</code> in your mounted config volume.
+          Plugin downloads are fetched from the latest <a href="https://github.com/Sportarr/Sportarr/releases/latest" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">GitHub release</a>.
         </p>
       </div>
 

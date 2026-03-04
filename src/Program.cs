@@ -1680,45 +1680,33 @@ app.MapPost("/api/system/backup/cleanup", async (Sportarr.Api.Services.BackupSer
 // API: Download Media Server Agents
 app.MapGet("/api/system/agents", () =>
 {
-    var agentsPath = Path.Combine(dataPath, "agents");
-    var agents = new List<object>();
-
-    if (Directory.Exists(agentsPath))
+    var agents = new List<object>
     {
-        // Check for Plex agent
-        var plexAgentPath = Path.Combine(agentsPath, "plex", "Sportarr.bundle");
-        if (Directory.Exists(plexAgentPath))
+        new
         {
-            agents.Add(new
-            {
-                name = "Plex",
-                type = "plex",
-                available = true,
-                path = plexAgentPath,
-                downloadUrl = "/api/system/agents/plex/download"
-            });
-        }
-
-        // Check for Jellyfin agent
-        var jellyfinAgentPath = Path.Combine(agentsPath, "jellyfin");
-        if (Directory.Exists(jellyfinAgentPath))
+            name = "Plex",
+            type = "plex",
+            available = true,
+            downloadUrl = "/api/system/agents/plex/download"
+        },
+        new
         {
-            agents.Add(new
-            {
-                name = "Jellyfin",
-                type = "jellyfin",
-                available = true,
-                path = jellyfinAgentPath,
-                downloadUrl = "/api/system/agents/jellyfin/download"
-            });
+            name = "Jellyfin",
+            type = "jellyfin",
+            available = true,
+            downloadUrl = "/api/system/agents/jellyfin/download",
+            repositoryUrl = "https://raw.githubusercontent.com/sportarr/Sportarr/main/agents/jellyfin/manifest.json"
+        },
+        new
+        {
+            name = "Emby",
+            type = "emby",
+            available = true,
+            downloadUrl = "/api/system/agents/emby/download"
         }
-    }
+    };
 
-    return Results.Ok(new
-    {
-        agentsPath = agentsPath,
-        agents = agents
-    });
+    return Results.Ok(new { agents });
 });
 
 app.MapGet("/api/system/agents/plex/download", async (HttpContext context, ILogger<Program> logger) =>
@@ -1774,107 +1762,80 @@ app.MapGet("/api/system/agents/plex/download", async (HttpContext context, ILogg
 
 app.MapGet("/api/system/agents/jellyfin/download", async (HttpContext context, ILogger<Program> logger) =>
 {
-    // Try config directory first, then fall back to app directory
-    var jellyfinAgentPath = Path.Combine(dataPath, "agents", "jellyfin");
-    logger.LogInformation("Checking for Jellyfin agent at: {Path}", jellyfinAgentPath);
-
-    if (!Directory.Exists(jellyfinAgentPath))
+    // Redirect to compiled plugin from latest GitHub release
+    var downloadUrl = await GetPluginDownloadUrl("jellyfin", logger);
+    if (downloadUrl != null)
     {
-        jellyfinAgentPath = Path.Combine(AppContext.BaseDirectory, "agents", "jellyfin");
-        logger.LogInformation("Not found, checking fallback at: {Path}", jellyfinAgentPath);
-    }
-
-    if (!Directory.Exists(jellyfinAgentPath))
-    {
-        logger.LogWarning("Jellyfin agent not found at either location");
-        context.Response.StatusCode = 404;
-        context.Response.ContentType = "application/json";
-        await context.Response.WriteAsync("{\"error\":\"Jellyfin agent not found. The agents folder may not be included in your build.\"}");
+        context.Response.Redirect(downloadUrl, permanent: false);
         return;
     }
 
-    try
-    {
-        logger.LogInformation("Creating zip from: {Path}", jellyfinAgentPath);
-
-        // Create a zip file in memory
-        using var memoryStream = new MemoryStream();
-        using (var archive = new System.IO.Compression.ZipArchive(memoryStream, System.IO.Compression.ZipArchiveMode.Create, true))
-        {
-            await AddDirectoryToZip(archive, jellyfinAgentPath, "jellyfin");
-        }
-
-        memoryStream.Position = 0;
-        var bytes = memoryStream.ToArray();
-
-        logger.LogInformation("Zip created successfully, size: {Size} bytes", bytes.Length);
-
-        context.Response.ContentType = "application/zip";
-        context.Response.Headers.Append("Content-Disposition", "attachment; filename=\"Sportarr-Jellyfin.zip\"");
-        context.Response.Headers.Append("Content-Length", bytes.Length.ToString());
-        await context.Response.Body.WriteAsync(bytes);
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Failed to create Jellyfin agent zip");
-        context.Response.StatusCode = 500;
-        context.Response.ContentType = "application/json";
-        await context.Response.WriteAsync($"{{\"error\":\"Failed to create zip: {ex.Message}\"}}");
-    }
+    // Fallback: redirect to GitHub releases page
+    logger.LogWarning("Could not find Jellyfin plugin asset in GitHub releases, redirecting to releases page");
+    context.Response.Redirect("https://github.com/Sportarr/Sportarr/releases/latest", permanent: false);
 });
 
 app.MapGet("/api/system/agents/emby/download", async (HttpContext context, ILogger<Program> logger) =>
 {
-    // Try config directory first, then fall back to app directory
-    var embyAgentPath = Path.Combine(dataPath, "agents", "emby");
-    logger.LogInformation("Checking for Emby agent at: {Path}", embyAgentPath);
-
-    if (!Directory.Exists(embyAgentPath))
+    // Redirect to compiled plugin from latest GitHub release
+    var downloadUrl = await GetPluginDownloadUrl("emby", logger);
+    if (downloadUrl != null)
     {
-        embyAgentPath = Path.Combine(AppContext.BaseDirectory, "agents", "emby");
-        logger.LogInformation("Not found, checking fallback at: {Path}", embyAgentPath);
-    }
-
-    if (!Directory.Exists(embyAgentPath))
-    {
-        logger.LogWarning("Emby agent not found at either location");
-        context.Response.StatusCode = 404;
-        context.Response.ContentType = "application/json";
-        await context.Response.WriteAsync("{\"error\":\"Emby agent not found. The agents folder may not be included in your build.\"}");
+        context.Response.Redirect(downloadUrl, permanent: false);
         return;
     }
 
+    // Fallback: redirect to GitHub releases page
+    logger.LogWarning("Could not find Emby plugin asset in GitHub releases, redirecting to releases page");
+    context.Response.Redirect("https://github.com/Sportarr/Sportarr/releases/latest", permanent: false);
+});
+
+// Helper: Get compiled plugin download URL from latest GitHub release
+static async Task<string?> GetPluginDownloadUrl(string pluginType, ILogger logger)
+{
     try
     {
-        logger.LogInformation("Creating zip from: {Path}", embyAgentPath);
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Add("User-Agent", $"Sportarr/{Sportarr.Api.Version.GetFullVersion()}");
+        httpClient.Timeout = TimeSpan.FromSeconds(15);
 
-        // Create a zip file in memory
-        using var memoryStream = new MemoryStream();
-        using (var archive = new System.IO.Compression.ZipArchive(memoryStream, System.IO.Compression.ZipArchiveMode.Create, true))
+        var response = await httpClient.GetAsync("https://api.github.com/repos/Sportarr/Sportarr/releases/latest");
+        if (!response.IsSuccessStatusCode)
         {
-            await AddDirectoryToZip(archive, embyAgentPath, "emby");
+            logger.LogWarning("Failed to fetch latest release from GitHub: {StatusCode}", response.StatusCode);
+            return null;
         }
 
-        memoryStream.Position = 0;
-        var bytes = memoryStream.ToArray();
+        var json = await response.Content.ReadAsStringAsync();
+        var release = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
 
-        logger.LogInformation("Zip created successfully, size: {Size} bytes", bytes.Length);
+        if (!release.TryGetProperty("assets", out var assets) || assets.ValueKind != System.Text.Json.JsonValueKind.Array)
+            return null;
 
-        context.Response.ContentType = "application/zip";
-        context.Response.Headers.Append("Content-Disposition", "attachment; filename=\"Sportarr-Emby.zip\"");
-        context.Response.Headers.Append("Content-Length", bytes.Length.ToString());
-        await context.Response.Body.WriteAsync(bytes);
+        // Look for the plugin asset (e.g., "sportarr-jellyfin-plugin_*.zip" or "sportarr-emby-plugin_*.zip")
+        var assetPrefix = $"sportarr-{pluginType}-plugin_";
+        foreach (var asset in assets.EnumerateArray())
+        {
+            var name = asset.GetProperty("name").GetString() ?? "";
+            if (name.StartsWith(assetPrefix, StringComparison.OrdinalIgnoreCase) && name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                var browserDownloadUrl = asset.GetProperty("browser_download_url").GetString();
+                logger.LogInformation("Found {PluginType} plugin asset: {Name} -> {Url}", pluginType, name, browserDownloadUrl);
+                return browserDownloadUrl;
+            }
+        }
+
+        logger.LogWarning("No {PluginType} plugin asset found in latest release", pluginType);
+        return null;
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Failed to create Emby agent zip");
-        context.Response.StatusCode = 500;
-        context.Response.ContentType = "application/json";
-        await context.Response.WriteAsync($"{{\"error\":\"Failed to create zip: {ex.Message}\"}}");
+        logger.LogError(ex, "Failed to get {PluginType} plugin download URL from GitHub", pluginType);
+        return null;
     }
-});
+}
 
-// Helper function to add a directory to a zip archive
+// Helper function to add a directory to a zip archive (used by Plex legacy agent download)
 static async Task AddDirectoryToZip(System.IO.Compression.ZipArchive archive, string sourceDir, string entryPrefix)
 {
     foreach (var file in Directory.GetFiles(sourceDir))
