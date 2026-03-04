@@ -350,13 +350,18 @@ public class LeagueEventSyncService
             bool titleChanged = false;
             bool episodeNumberChanged = false;
 
-            // Event Date (CRITICAL: triggers episode renumbering if changed)
-            if (existingEvent.EventDate.Date != apiEvent.EventDate.Date)
+            // Event Date and Time (CRITICAL: triggers episode renumbering if changed)
+            // Compare full DateTime (not just .Date) so time-of-day updates are detected.
+            // TheSportsDB may initially return null strTimestamp (date-only fallback at midnight),
+            // then later populate strTimestamp with the actual event time (e.g., 03:50 UTC).
+            // Without comparing time, same-day events (Q1, Q2, Sprint) keep midnight timestamps
+            // and fall back to ExternalId ordering, which doesn't match chronological order.
+            if (existingEvent.EventDate != apiEvent.EventDate)
             {
-                _logger.LogInformation("[League Event Sync] Event date changed for '{EventTitle}': {OldDate} → {NewDate}",
+                _logger.LogInformation("[League Event Sync] Event date/time changed for '{EventTitle}': {OldDate} → {NewDate}",
                     apiEvent.Title,
-                    existingEvent.EventDate.ToString("yyyy-MM-dd"),
-                    apiEvent.EventDate.ToString("yyyy-MM-dd"));
+                    existingEvent.EventDate.ToString("yyyy-MM-dd HH:mm:ss"),
+                    apiEvent.EventDate.ToString("yyyy-MM-dd HH:mm:ss"));
                 existingEvent.EventDate = apiEvent.EventDate;
                 dateChanged = true;
                 needsUpdate = true;
