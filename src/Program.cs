@@ -2135,7 +2135,25 @@ app.MapPost("/api/library/import", async (Sportarr.Api.Services.LibraryImportSer
     }
 });
 
-// API: Library Import - Search TheSportsDB for events to match unmatched files
+
+// Returns a fresh destination preview for a manually selected event + file.
+// Called by the Edit modal after the user picks an event so the preview stays accurate.
+app.MapGet("/api/library/preview", async (Sportarr.Api.Services.LibraryImportService service, int eventId, string fileName) =>
+{
+    try
+    {
+        var preview = await service.BuildDestinationPreviewForEventAsync(eventId, fileName);
+        if (preview == null)
+            return Results.NotFound(new { error = "Event not found" });
+        return Results.Ok(new { destinationPreview = preview });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Failed to build preview: {ex.Message}");
+    }
+});
+
+// API: Library Import - Search Sportarr event database for events to match unmatched files
 app.MapGet("/api/library/search", async (
     Sportarr.Api.Services.TheSportsDBClient theSportsDB,
     SportarrDbContext db,
@@ -2148,7 +2166,7 @@ app.MapGet("/api/library/search", async (
         var results = new List<object>();
 
         // Search TheSportsDB for events
-        var apiEvents = await theSportsDB.SearchEventAsync(query);
+        // Search Sportarr event database (data sourced from sports data API)
         if (apiEvents != null)
         {
             foreach (var evt in apiEvents.Take(20)) // Limit to 20 results

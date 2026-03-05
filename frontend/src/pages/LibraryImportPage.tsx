@@ -69,6 +69,7 @@ interface FileMapping {
   partName?: string;
   partNumber?: number;
   createNew?: boolean;
+  destinationPreview?: string;
 }
 
 interface ImportResult {
@@ -215,8 +216,21 @@ const LibraryImportPage: React.FC = () => {
     setShowFileDetailsModal(true);
   };
 
-  const handleFileDetailsSave = (mapping: FileMapping) => {
+  const handleFileDetailsSave = async (mapping: FileMapping) => {
     if (!activeFile) return;
+
+    // Fetch a fresh destination preview from the server so it reflects
+    // the manually selected event, not the original auto-match
+    if (mapping.eventId) {
+      try {
+        const resp = await apiGet<{ destinationPreview: string }>(
+          `/api/library/preview?eventId=${mapping.eventId}&fileName=${encodeURIComponent(activeFile.fileName)}`
+        );
+        mapping = { ...mapping, destinationPreview: resp.destinationPreview };
+      } catch {
+        // Non-fatal: preview will fall back to eventTitle
+      }
+    }
 
     const newMappings = new Map(fileEventMappings);
     newMappings.set(activeFile.filePath, mapping);
@@ -582,7 +596,7 @@ const LibraryImportPage: React.FC = () => {
                           <div className="flex-1 min-w-0">
                             <p className="text-white font-medium truncate">{file.fileName}</p>
                             <p className="text-sm text-gray-400">
-                              → <span className="text-green-400">{file.destinationPreview || mapping?.eventTitle || file.matchedEventTitle}</span>
+                              → <span className="text-green-400">{mapping?.destinationPreview || file.destinationPreview || mapping?.eventTitle || file.matchedEventTitle}</span>
                               {mapping?.partName && (
                                 <span className="text-blue-400 ml-1">({mapping.partName})</span>
                               )}

@@ -73,6 +73,9 @@ public class LibraryImportService
 
             result.TotalFiles = files.Count;
 
+            // Track event IDs claimed by earlier files in this batch so two files can't match the same event
+            var claimedEventIds = new HashSet<int>();
+
             foreach (var filePath in files)
             {
                 try
@@ -96,6 +99,13 @@ public class LibraryImportService
                     // Extract year from filename, path, and parsed data
                     // CRITICAL: This prevents matching files to wrong events from different years
                     var parsedYear = ExtractYearFromPath(filePath, filename, sportsResult.EventYear, eventDate);
+
+                    // Check for explicit SxxxxExx episode number in filename (e.g. "Formula E - S2025E05 - Jeddah E Prix")
+                    // This is the highest-confidence signal — treated like Sonarr's S/E parsing
+                    int? explicitEpisodeNumber = null;
+                    var seMatch = System.Text.RegularExpressions.Regex.Match(filename, @"S\d{4}E(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (seMatch.Success && int.TryParse(seMatch.Groups[1].Value, out var seEp))
+                        explicitEpisodeNumber = seEp;
 
                     // Check if file is already in library
                     // First check Event.FilePath (main file path)
@@ -132,15 +142,20 @@ public class LibraryImportService
 
                     if (!string.IsNullOrEmpty(eventTitle))
                     {
-                        // Strategy 1: Direct title match
+                        // Load candidates, excluding events already claimed by earlier files in this scan batch
+                        // and events that already have files
                         var candidates = await _db.Events
                             .Include(e => e.League)
-                            .Where(e => !e.HasFile)
+                            .Where(e => !e.HasFile && !claimedEventIds.Contains(e.Id))
                             .ToListAsync();
 
                         foreach (var candidate in candidates)
                         {
-                            var confidence = CalculateMatchConfidence(eventTitle, candidate.Title, organization, candidate, eventDate, parsedYear);
+                            var confidence = CalculateMatchConfidence(
+                                eventTitle, candidate.Title, organization, candidate,
+                                eventDate, parsedYear, sportsResult.RoundNumber,
+                                sportsResult.SeasonYearEnd, explicitEpisodeNumber,
+                                sportsResult.Location);
                             if (confidence > matchConfidence)
                             {
                                 matchConfidence = confidence;
@@ -154,6 +169,10 @@ public class LibraryImportService
                             matchedEvent = null;
                             matchConfidence = 0;
                         }
+
+                        // Reserve this event so no other file in this batch can claim it
+                        if (matchedEvent != null)
+                            claimedEventIds.Add(matchedEvent.Id);
                     }
 
                     // Build destination preview for matched files
@@ -1043,53 +1062,102 @@ public class LibraryImportService
     /// <summary>
     /// Calculate match confidence between a parsed filename and a database event
     /// </summary>
-    private int CalculateMatchConfidence(string searchTitle, string eventTitle, string? organization, Event evt, DateTime? parsedDate, int? parsedYear = null)
+    private int CalculateMatchConfidence(
+        string searchTitle,
+        string eventTitle,
+        string? organization,
+        Event evt,
+        DateTime? parsedDate,
+        int? parsedYear = null,
+        int? parsedRoundNumber = null,
+        int? seasonYearEnd = null,
+        int? explicitEpisodeNumber = null,
+        string? parsedLocation = null)
     {
         int confidence = 0;
 
-        // CRITICAL: Year/season mismatch check - sports teams play each other every year
-        // If we have a year from the filename/path and it doesn't match the event year, reject the match
+        // ── ROUND NUMBER (highest priority — like S/E in Sonarr) ────────────────
+        // If the filename has a round number, it's the primary identifier.
+        // A round match gives a large bonus; a round mismatch is an immediate rejection.
+        if (parsedRoundNumber.HasValue && evt.EpisodeNumber.HasValue)
+        {
+            if (evt.EpisodeNumber.Value == parsedRoundNumber.Value)
+            {
+                confidence += 50;
+                _logger.LogDebug("[Match] Round {Round} matches EpisodeNumber for '{Event}'", parsedRoundNumber.Value, eventTitle);
+            }
+            else
+            {
+                _logger.LogDebug("[Match] Round mismatch: file round {FileRound} vs event episode {EventEp} for '{Event}'",
+                    parsedRoundNumber.Value, evt.EpisodeNumber.Value, eventTitle);
+                return 0; // Wrong round — definitely wrong event
+            }
+        }
+
+        // ── EXPLICIT S/E EPISODE NUMBER ─────────────────────────────────────────
+        // Files with S2025E05 in the name — episode number is authoritative
+        if (explicitEpisodeNumber.HasValue && evt.EpisodeNumber.HasValue)
+        {
+            if (evt.EpisodeNumber.Value == explicitEpisodeNumber.Value)
+                confidence += 50;
+            else
+                return 0; // Episode number mismatch — wrong event
+        }
+
+        // ── YEAR / SEASON CHECK ─────────────────────────────────────────────────
+        // CRITICAL: sports events repeat every year. Year mismatch = wrong season.
         if (parsedYear.HasValue)
         {
             var eventYear = evt.EventDate.Year;
-            // Also check season number/string for year
             var eventSeasonYear = evt.SeasonNumber ?? (int.TryParse(evt.Season, out var sy) ? sy : (int?)null);
 
-            if (eventYear != parsedYear.Value && eventSeasonYear != parsedYear.Value)
+            // Accept if parsedYear matches:
+            // (a) the event's calendar year directly, OR
+            // (b) the start year of the season (e.g. SeasonNumber = 2025 for "2025-2026"), OR
+            // (c) the end year of a season span (e.g. SeasonYearEnd = 2026 for "2025-2026")
+            var yearMatches = eventYear == parsedYear.Value
+                || eventSeasonYear == parsedYear.Value
+                || (seasonYearEnd.HasValue && parsedYear.Value <= seasonYearEnd.Value
+                    && eventSeasonYear.HasValue && parsedYear.Value >= eventSeasonYear.Value);
+
+            if (!yearMatches)
             {
-                // Year mismatch is a critical failure for sports events
-                // Return 0 - this is almost certainly the wrong event (same teams, different year)
                 _logger.LogDebug("[Match] Year mismatch: file has {ParsedYear}, event '{Event}' is from {EventYear} (Season: {Season})",
                     parsedYear.Value, eventTitle, eventYear, evt.Season);
                 return 0;
             }
             else
             {
-                // Year match is a strong indicator - add significant points
                 confidence += 25;
             }
         }
 
-        // Normalize titles
+        // ── TITLE SIMILARITY ────────────────────────────────────────────────────
         var normalizedSearch = NormalizeTitle(searchTitle);
         var normalizedEvent = NormalizeTitle(eventTitle);
 
-        // Exact title match = 60 points
         if (normalizedSearch.Equals(normalizedEvent, StringComparison.OrdinalIgnoreCase))
         {
             confidence += 60;
         }
-        // Contains match = 40 points
         else if (normalizedEvent.Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase) ||
                  normalizedSearch.Contains(normalizedEvent, StringComparison.OrdinalIgnoreCase))
         {
             confidence += 40;
         }
-        // Partial word match
         else
         {
+            // Partial word match — also check location against event title
             var searchWords = normalizedSearch.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             var eventWords = normalizedEvent.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+            // If we have a parsed location, include it in the word set for matching
+            if (!string.IsNullOrEmpty(parsedLocation))
+            {
+                var locationWords = parsedLocation.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                searchWords = searchWords.Union(locationWords, StringComparer.OrdinalIgnoreCase).ToArray();
+            }
+
             var matchingWords = searchWords.Intersect(eventWords, StringComparer.OrdinalIgnoreCase).Count();
             var totalWords = Math.Max(searchWords.Length, eventWords.Length);
 
@@ -1100,7 +1168,7 @@ public class LibraryImportService
             }
         }
 
-        // Organization matches league = +15 points
+        // ── ORGANIZATION → LEAGUE ───────────────────────────────────────────────
         if (!string.IsNullOrEmpty(organization) && evt.League != null)
         {
             if (evt.League.Name.Contains(organization, StringComparison.OrdinalIgnoreCase) ||
@@ -1110,7 +1178,7 @@ public class LibraryImportService
             }
         }
 
-        // Date match bonus (only if we have a specific date, not just year)
+        // ── DATE PROXIMITY ──────────────────────────────────────────────────────
         if (parsedDate != null)
         {
             var daysDiff = Math.Abs((evt.EventDate - parsedDate.Value).TotalDays);
@@ -1119,7 +1187,7 @@ public class LibraryImportService
             else if (daysDiff <= 7) confidence += 5;
         }
 
-        // Event is recent (within 30 days) = 5 points
+        // ── RECENCY ─────────────────────────────────────────────────────────────
         if (Math.Abs((DateTime.UtcNow - evt.EventDate).TotalDays) <= 30)
         {
             confidence += 5;
@@ -1145,6 +1213,18 @@ public class LibraryImportService
     /// Uses the same FileNamingService methods that actual import uses for consistency.
     /// Example: "UFC / Season 2025 / UFC 320 / UFC - S2025E45 - UFC 320.mkv"
     /// </summary>
+    /// <summary>
+    /// Public wrapper: build the destination preview for a specific event + file combination.
+    /// Used by the /api/library/preview endpoint so the UI can refresh the preview after manual selection.
+    /// </summary>
+    public async Task<string?> BuildDestinationPreviewForEventAsync(int eventId, string originalFileName)
+    {
+        var evt = await _db.Events.Include(e => e.League).FirstOrDefaultAsync(e => e.Id == eventId);
+        if (evt == null) return null;
+        var settings = await GetMediaManagementSettingsAsync();
+        return BuildDestinationPreview(evt, originalFileName, settings);
+    }
+
     private string BuildDestinationPreview(Event matchedEvent, string originalFileName, MediaManagementSettings settings)
     {
         var extension = Path.GetExtension(originalFileName);
