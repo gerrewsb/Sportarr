@@ -13,13 +13,13 @@ public class FileRenameService
 {
     private readonly SportarrDbContext _db;
     private readonly FileNamingService _fileNamingService;
-    private readonly TheSportsDBClient _theSportsDBClient;
+    private readonly SportarrApiClient _theSportsDBClient;
     private readonly ILogger<FileRenameService> _logger;
 
     public FileRenameService(
         SportarrDbContext db,
         FileNamingService fileNamingService,
-        TheSportsDBClient theSportsDBClient,
+        SportarrApiClient theSportsDBClient,
         ILogger<FileRenameService> logger)
     {
         _db = db;

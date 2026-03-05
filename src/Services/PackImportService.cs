@@ -18,7 +18,7 @@ public class PackImportService
     private readonly ConfigService _configService;
     private readonly DiskSpaceService _diskSpaceService;
     private readonly ReleaseEvaluator _releaseEvaluator;
-    private readonly TheSportsDBClient _theSportsDBClient;
+    private readonly SportarrApiClient _theSportsDBClient;
     private readonly ILogger<PackImportService> _logger;
 
     // Supported video file extensions
@@ -31,7 +31,7 @@ public class PackImportService
         ConfigService configService,
         DiskSpaceService diskSpaceService,
         ReleaseEvaluator releaseEvaluator,
-        TheSportsDBClient theSportsDBClient,
+        SportarrApiClient theSportsDBClient,
         ILogger<PackImportService> logger)
     {
         _db = db;

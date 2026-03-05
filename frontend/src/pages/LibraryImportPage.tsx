@@ -174,7 +174,7 @@ const LibraryImportPage: React.FC = () => {
     }
   };
 
-  // TheSportsDB search for unmatched files
+  // Sportarr API search for unmatched files
   const searchEvents = useCallback((query: string) => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);

@@ -18,7 +18,7 @@ public class LibraryImportService
     private readonly FileNamingService _namingService;
     private readonly EventPartDetector _partDetector;
     private readonly ConfigService _configService;
-    private readonly TheSportsDBClient _theSportsDBClient;
+    private readonly SportarrApiClient _theSportsDBClient;
 
     private static readonly string[] VideoExtensions = { ".mkv", ".mp4", ".avi", ".m4v", ".mov", ".wmv", ".ts", ".webm", ".flv" };
 
@@ -30,7 +30,7 @@ public class LibraryImportService
         FileNamingService namingService,
         EventPartDetector partDetector,
         ConfigService configService,
-        TheSportsDBClient theSportsDBClient)
+        SportarrApiClient theSportsDBClient)
     {
         _db = db;
         _logger = logger;

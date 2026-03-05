@@ -18,7 +18,7 @@ public class FileImportService : IFileImportService
     private readonly EventPartDetector _partDetector;
     private readonly ConfigService _configService;
     private readonly DiskSpaceService _diskSpaceService;
-    private readonly TheSportsDBClient _theSportsDBClient;
+    private readonly SportarrApiClient _theSportsDBClient;
     private readonly NotificationService _notificationService;
     private readonly ILogger<FileImportService> _logger;
 
@@ -33,7 +33,7 @@ public class FileImportService : IFileImportService
         EventPartDetector partDetector,
         ConfigService configService,
         DiskSpaceService diskSpaceService,
-        TheSportsDBClient theSportsDBClient,
+        SportarrApiClient theSportsDBClient,
         NotificationService notificationService,
         ILogger<FileImportService> logger)
     {

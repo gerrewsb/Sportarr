@@ -321,7 +321,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
 
     // Enable case-insensitive property name matching for JSON deserialization
-    // This allows TheSportsDB API responses (idLeague, strLeague) to map to our League model
+    // This allows Sportarr API responses (idLeague, strLeague) to map to our League model
     options.SerializerOptions.PropertyNameCaseInsensitive = true;
 
     // Handle circular references (e.g., Event -> League -> Events -> Event)
@@ -370,7 +370,7 @@ builder.Services.AddScoped<Sportarr.Api.Services.ImportListService>();
 // ImportService removed - CompletedDownloadHandlingService now uses FileImportService which has proper folder structure with episode numbers
 builder.Services.AddScoped<Sportarr.Api.Services.ProvideImportItemService>(); // Provides import items with path translation
 builder.Services.AddScoped<Sportarr.Api.Services.EventQueryService>(); // Universal: Sport-aware query builder for all sports
-builder.Services.AddScoped<Sportarr.Api.Services.LeagueEventSyncService>(); // Syncs events from TheSportsDB to populate leagues
+builder.Services.AddScoped<Sportarr.Api.Services.LeagueEventSyncService>(); // Syncs events from Sportarr API to populate leagues
 builder.Services.AddScoped<Sportarr.Api.Services.TeamLeagueDiscoveryService>(); // Discovers leagues for followed teams (cross-league team monitoring)
 builder.Services.AddScoped<Sportarr.Api.Services.SeasonSearchService>(); // Season-level search for manual season pack discovery
 builder.Services.AddScoped<Sportarr.Api.Services.EventMappingService>(); // Event mapping sync and lookup for release name matching
@@ -378,15 +378,15 @@ builder.Services.AddScoped<Sportarr.Api.Services.PackImportService>(); // Multi-
 builder.Services.AddHostedService<Sportarr.Api.Services.EventMappingSyncBackgroundService>(); // Automatic event mapping sync every 12 hours (like Sonarr XEM)
 builder.Services.AddHostedService<Sportarr.Api.Services.LeagueEventAutoSyncService>(); // Background service for automatic periodic event sync
 
-// TheSportsDB client for universal sports metadata (via Sportarr-API)
-builder.Services.AddHttpClient<Sportarr.Api.Services.TheSportsDBClient>()
+// Sportarr API client for sports metadata (sportarr.net)
+builder.Services.AddHttpClient<Sportarr.Api.Services.SportarrApiClient>()
     .AddTransientHttpErrorPolicy(policyBuilder =>
         policyBuilder.WaitAndRetryAsync(
             retryCount: 3,
             sleepDurationProvider: attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)),
             onRetry: (outcome, timespan, retryAttempt, context) =>
             {
-                Console.WriteLine($"[TheSportsDB] Retry {retryAttempt} after {timespan.TotalSeconds}s delay");
+                Console.WriteLine($"[SportarrAPI] Retry {retryAttempt} after {timespan.TotalSeconds}s delay");
             }
         ));
 
@@ -1175,7 +1175,7 @@ static void CreateDefaultAgents(string agentsDestPath)
 
     // Create Info.plist for Plex (using LF line endings)
     var infoPlistPath = Path.Combine(agentsDestPath, "plex", "Sportarr.bundle", "Contents");
-    var infoPlist = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n    <key>CFBundleIdentifier</key>\n    <string>com.sportarr.agents.sportarr</string>\n\n    <key>PlexPluginClass</key>\n    <string>Agent</string>\n\n    <key>PlexClientPlatforms</key>\n    <string>*</string>\n\n    <key>PlexClientPlatformExclusions</key>\n    <string></string>\n\n    <key>PlexFrameworkVersion</key>\n    <string>2</string>\n\n    <key>PlexPluginCodePolicy</key>\n    <string>Elevated</string>\n\n    <key>PlexBundleVersion</key>\n    <string>1</string>\n\n    <key>CFBundleVersion</key>\n    <string>1.0.0</string>\n\n    <key>PlexAgentAttributionText</key>\n    <string>Metadata provided by Sportarr (powered by TheSportsDB)</string>\n</dict>\n</plist>\n";
+    var infoPlist = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n    <key>CFBundleIdentifier</key>\n    <string>com.sportarr.agents.sportarr</string>\n\n    <key>PlexPluginClass</key>\n    <string>Agent</string>\n\n    <key>PlexClientPlatforms</key>\n    <string>*</string>\n\n    <key>PlexClientPlatformExclusions</key>\n    <string></string>\n\n    <key>PlexFrameworkVersion</key>\n    <string>2</string>\n\n    <key>PlexPluginCodePolicy</key>\n    <string>Elevated</string>\n\n    <key>PlexBundleVersion</key>\n    <string>1</string>\n\n    <key>CFBundleVersion</key>\n    <string>1.0.0</string>\n\n    <key>PlexAgentAttributionText</key>\n    <string>Metadata provided by Sportarr</string>\n</dict>\n</plist>\n";
     File.WriteAllText(Path.Combine(infoPlistPath, "Info.plist"), infoPlist);
 
     // Create Jellyfin agent placeholder
@@ -2155,7 +2155,7 @@ app.MapGet("/api/library/preview", async (Sportarr.Api.Services.LibraryImportSer
 
 // API: Library Import - Search Sportarr event database for events to match unmatched files
 app.MapGet("/api/library/search", async (
-    Sportarr.Api.Services.TheSportsDBClient theSportsDB,
+    Sportarr.Api.Services.SportarrApiClient theSportsDB,
     SportarrDbContext db,
     string query,
     string? sport = null,
@@ -2165,7 +2165,6 @@ app.MapGet("/api/library/search", async (
     {
         var results = new List<object>();
 
-        // Search TheSportsDB for events
         // Search Sportarr event database (data sourced from sports data API)
         if (apiEvents != null)
         {
@@ -5004,13 +5003,13 @@ app.MapGet("/api/queue", async (SportarrDbContext db) =>
         .ToListAsync();
 
     // Map to response format with clean Event serialization
-    // The Event model has [JsonPropertyName] attributes for TheSportsDB API deserialization
+    // The Event model has [JsonPropertyName] attributes for Sportarr API deserialization
     // which conflict with frontend expectations (strEvent vs title)
     var response = queue.Select(dq => new
     {
         dq.Id,
         dq.EventId,
-        // Map Event to clean format without TheSportsDB JsonPropertyName attributes
+        // Map Event to clean format without Sportarr API JsonPropertyName attributes
         Event = dq.Event != null ? new
         {
             dq.Event.Id,
@@ -9650,11 +9649,11 @@ app.MapGet("/api/leagues/{id:int}/seasons/{season}/files", async (int id, string
 });
 
 // API: Get teams by external league ID (for Add League modal - before league is added to DB)
-app.MapGet("/api/leagues/external/{externalId}/teams", async (string externalId, TheSportsDBClient sportsDbClient, ILogger<Program> logger) =>
+app.MapGet("/api/leagues/external/{externalId}/teams", async (string externalId, SportarrApiClient sportsDbClient, ILogger<Program> logger) =>
 {
     logger.LogInformation("[LEAGUES] Getting teams for external league ID: {ExternalId}", externalId);
 
-    // Fetch teams from TheSportsDB
+    // Fetch teams from Sportarr API
     var teams = await sportsDbClient.GetLeagueTeamsAsync(externalId);
     if (teams == null || !teams.Any())
     {
@@ -9683,7 +9682,7 @@ app.MapGet("/api/fighting/event-types", (string leagueName) =>
 });
 
 // API: Get teams for a league (for team selection in Add League modal)
-app.MapGet("/api/leagues/{id:int}/teams", async (int id, SportarrDbContext db, TheSportsDBClient sportsDbClient, ILogger<Program> logger) =>
+app.MapGet("/api/leagues/{id:int}/teams", async (int id, SportarrDbContext db, SportarrApiClient sportsDbClient, ILogger<Program> logger) =>
 {
     logger.LogInformation("[LEAGUES] Getting teams for league ID: {LeagueId}", id);
 
@@ -9695,14 +9694,14 @@ app.MapGet("/api/leagues/{id:int}/teams", async (int id, SportarrDbContext db, T
         return Results.NotFound(new { error = "League not found" });
     }
 
-    // Check if league has external ID (required for TheSportsDB API)
+    // Check if league has external ID (required for Sportarr API)
     if (string.IsNullOrEmpty(league.ExternalId))
     {
         logger.LogWarning("[LEAGUES] League missing external ID: {LeagueName}", league.Name);
-        return Results.BadRequest(new { error = "League is missing TheSportsDB external ID" });
+        return Results.BadRequest(new { error = "League is missing Sportarr API external ID" });
     }
 
-    // Fetch teams from TheSportsDB
+    // Fetch teams from Sportarr API
     var teams = await sportsDbClient.GetLeagueTeamsAsync(league.ExternalId);
     if (teams == null || !teams.Any())
     {
@@ -10124,8 +10123,8 @@ app.MapGet("/api/search/available-tokens", (ILogger<Program> logger) =>
     return Results.Ok(tokens);
 });
 
-// API: Get all leagues from TheSportsDB (cached)
-app.MapGet("/api/leagues/all", async (Sportarr.Api.Services.TheSportsDBClient sportsDbClient, ILogger<Program> logger) =>
+// API: Get all leagues from Sportarr API (cached)
+app.MapGet("/api/leagues/all", async (Sportarr.Api.Services.SportarrApiClient sportsDbClient, ILogger<Program> logger) =>
 {
     logger.LogInformation("[LEAGUES] Fetching all leagues from cache");
 
@@ -10148,12 +10147,12 @@ app.MapGet("/api/leagues/all", async (Sportarr.Api.Services.TheSportsDBClient sp
         logger.LogInformation("[LEAGUES] Sample without logo: {Name} - ExternalId: {Id}", sampleWithoutLogo.Name, sampleWithoutLogo.ExternalId);
 
     // Convert to DTO to ensure correct field names for frontend (strBadge, strLogo, etc.)
-    var dtos = results.Select(TheSportsDBLeagueDto.FromLeague).ToList();
+    var dtos = results.Select(SportarrLeagueDto.FromLeague).ToList();
     return Results.Ok(dtos);
 });
 
-// API: Search leagues from TheSportsDB
-app.MapGet("/api/leagues/search/{query}", async (string query, Sportarr.Api.Services.TheSportsDBClient sportsDbClient, ILogger<Program> logger) =>
+// API: Search leagues from Sportarr API
+app.MapGet("/api/leagues/search/{query}", async (string query, Sportarr.Api.Services.SportarrApiClient sportsDbClient, ILogger<Program> logger) =>
 {
     logger.LogInformation("[LEAGUES SEARCH] Searching for: {Query}", query);
 
@@ -10167,12 +10166,12 @@ app.MapGet("/api/leagues/search/{query}", async (string query, Sportarr.Api.Serv
 
     logger.LogInformation("[LEAGUES SEARCH] Found {Count} results", results.Count);
     // Convert to DTO to ensure correct field names for frontend (strBadge, strLogo, etc.)
-    var dtos = results.Select(TheSportsDBLeagueDto.FromLeague).ToList();
+    var dtos = results.Select(SportarrLeagueDto.FromLeague).ToList();
     return Results.Ok(dtos);
 });
 
 // API: Add league to library
-app.MapPost("/api/leagues", async (HttpContext context, SportarrDbContext db, IServiceScopeFactory scopeFactory, TheSportsDBClient sportsDbClient, ILogger<Program> logger) =>
+app.MapPost("/api/leagues", async (HttpContext context, SportarrDbContext db, IServiceScopeFactory scopeFactory, SportarrApiClient sportsDbClient, ILogger<Program> logger) =>
 {
     logger.LogInformation("[LEAGUES] POST /api/leagues - Request received");
 
@@ -10271,7 +10270,7 @@ app.MapPost("/api/leagues", async (HttpContext context, SportarrDbContext db, IS
 
                 if (team == null)
                 {
-                    // Fetch team details from TheSportsDB to populate Team table
+                    // Fetch team details from Sportarr API to populate Team table
                     var teams = await sportsDbClient.GetLeagueTeamsAsync(league.ExternalId!);
                     var teamData = teams?.FirstOrDefault(t => t.ExternalId == teamExternalId);
 
@@ -10407,7 +10406,7 @@ app.MapPost("/api/leagues", async (HttpContext context, SportarrDbContext db, IS
 // Removed duplicate PUT endpoint - now using JsonElement-based endpoint above for partial updates
 
 // API: Update monitored teams for a league
-app.MapPut("/api/leagues/{id:int}/teams", async (int id, UpdateMonitoredTeamsRequest request, SportarrDbContext db, TheSportsDBClient sportsDbClient, ILogger<Program> logger) =>
+app.MapPut("/api/leagues/{id:int}/teams", async (int id, UpdateMonitoredTeamsRequest request, SportarrDbContext db, SportarrApiClient sportsDbClient, ILogger<Program> logger) =>
 {
     // Use a transaction to ensure all changes succeed or fail together
     using var transaction = await db.Database.BeginTransactionAsync();
@@ -10459,7 +10458,7 @@ app.MapPut("/api/leagues/{id:int}/teams", async (int id, UpdateMonitoredTeamsReq
 
             if (team == null)
             {
-                // Fetch team details from TheSportsDB
+                // Fetch team details from Sportarr API
                 var teams = await sportsDbClient.GetLeagueTeamsAsync(league.ExternalId!);
                 var teamData = teams?.FirstOrDefault(t => t.ExternalId == teamExternalId);
 
@@ -10755,7 +10754,7 @@ app.MapPost("/api/leagues/rename", async (HttpContext context, SportarrDbContext
     }
 });
 
-// API: Refresh events for a league from TheSportsDB
+// API: Refresh events for a league from Sportarr API
 app.MapPost("/api/leagues/{id:int}/refresh-events", async (
     int id,
     SportarrDbContext db,
@@ -10763,7 +10762,7 @@ app.MapPost("/api/leagues/{id:int}/refresh-events", async (
     ILogger<Program> logger,
     HttpContext context) =>
 {
-    logger.LogInformation("[LEAGUES] POST /api/leagues/{Id}/refresh-events - Refreshing events from TheSportsDB", id);
+    logger.LogInformation("[LEAGUES] POST /api/leagues/{Id}/refresh-events - Refreshing events from Sportarr API", id);
 
     try
     {
@@ -10917,7 +10916,7 @@ app.MapGet("/api/followed-teams", async (SportarrDbContext db) =>
 });
 
 // API: Follow a team (add to followed teams)
-app.MapPost("/api/followed-teams", async (HttpContext context, SportarrDbContext db, TheSportsDBClient sportsDbClient, ILogger<Program> logger) =>
+app.MapPost("/api/followed-teams", async (HttpContext context, SportarrDbContext db, SportarrApiClient sportsDbClient, ILogger<Program> logger) =>
 {
     try
     {
@@ -11039,7 +11038,7 @@ app.MapGet("/api/followed-teams/{id:int}/leagues", async (int id, SportarrDbCont
 });
 
 // API: Bulk add leagues for a followed team
-app.MapPost("/api/followed-teams/{id:int}/add-leagues", async (int id, HttpContext context, SportarrDbContext db, TheSportsDBClient sportsDbClient, IServiceScopeFactory scopeFactory, ILogger<Program> logger) =>
+app.MapPost("/api/followed-teams/{id:int}/add-leagues", async (int id, HttpContext context, SportarrDbContext db, SportarrApiClient sportsDbClient, IServiceScopeFactory scopeFactory, ILogger<Program> logger) =>
 {
     var followedTeam = await db.FollowedTeams.FindAsync(id);
     if (followedTeam == null)
@@ -11144,7 +11143,7 @@ app.MapPost("/api/followed-teams/{id:int}/add-leagues", async (int id, HttpConte
                 var leagueDetails = await sportsDbClient.LookupLeagueAsync(externalId!);
                 if (leagueDetails == null)
                 {
-                    erroredLeagues.Add(new { externalId, reason = "League not found in TheSportsDB" });
+                    erroredLeagues.Add(new { externalId, reason = "League not found in Sportarr API" });
                     continue;
                 }
 
@@ -11307,8 +11306,8 @@ app.MapGet("/api/teams/{id:int}", async (int id, SportarrDbContext db) =>
     });
 });
 
-// API: Search teams from TheSportsDB
-app.MapGet("/api/teams/search/{query}", async (string query, Sportarr.Api.Services.TheSportsDBClient sportsDbClient, ILogger<Program> logger) =>
+// API: Search teams from Sportarr API
+app.MapGet("/api/teams/search/{query}", async (string query, Sportarr.Api.Services.SportarrApiClient sportsDbClient, ILogger<Program> logger) =>
 {
     logger.LogInformation("[TEAMS SEARCH] Searching for: {Query}", query);
 
@@ -11326,7 +11325,7 @@ app.MapGet("/api/teams/search/{query}", async (string query, Sportarr.Api.Servic
 
 // API: Get all teams for supported sports (Soccer, Basketball, Ice Hockey)
 // Used by the Add Team page to show all teams that can be followed
-app.MapGet("/api/teams/all", async (string? sports, Sportarr.Api.Services.TheSportsDBClient sportsDbClient, ILogger<Program> logger) =>
+app.MapGet("/api/teams/all", async (string? sports, Sportarr.Api.Services.SportarrApiClient sportsDbClient, ILogger<Program> logger) =>
 {
     // Parse optional sports filter (comma-separated list)
     var sportsList = !string.IsNullOrEmpty(sports)
@@ -11349,7 +11348,7 @@ app.MapGet("/api/teams/all", async (string? sports, Sportarr.Api.Services.TheSpo
 });
 
 // ========================================
-// EVENT SEARCH ENDPOINTS (TheSportsDB)
+// EVENT SEARCH ENDPOINTS (Sportarr API)
 // ========================================
 
 // GET /api/events/tv-schedule?date=2024-01-15&sport=Soccer
@@ -11357,7 +11356,7 @@ app.MapGet("/api/teams/all", async (string? sports, Sportarr.Api.Services.TheSpo
 app.MapGet("/api/events/tv-schedule", async (
     string? date,
     string? sport,
-    Sportarr.Api.Services.TheSportsDBClient sportsDbClient,
+    Sportarr.Api.Services.SportarrApiClient sportsDbClient,
     ILogger<Program> logger) =>
 {
     logger.LogInformation("[EVENTS TV-SCHEDULE] GET /api/events/tv-schedule?date={Date}&sport={Sport}", date, sport);
@@ -11388,7 +11387,7 @@ app.MapGet("/api/events/tv-schedule", async (
     catch (Exception ex)
     {
         logger.LogError(ex, "[EVENTS TV-SCHEDULE] Error fetching TV schedule");
-        return Results.Problem("Failed to fetch TV schedule from TheSportsDB");
+        return Results.Problem("Failed to fetch TV schedule from Sportarr API");
     }
 });
 
@@ -11396,7 +11395,7 @@ app.MapGet("/api/events/tv-schedule", async (
 // Get live and recent events for a sport
 app.MapGet("/api/events/livescore", async (
     string sport,
-    Sportarr.Api.Services.TheSportsDBClient sportsDbClient,
+    Sportarr.Api.Services.SportarrApiClient sportsDbClient,
     ILogger<Program> logger) =>
 {
     logger.LogInformation("[EVENTS LIVESCORE] GET /api/events/livescore?sport={Sport}", sport);
@@ -11415,7 +11414,7 @@ app.MapGet("/api/events/livescore", async (
     catch (Exception ex)
     {
         logger.LogError(ex, "[EVENTS LIVESCORE] Error fetching livescore");
-        return Results.Problem("Failed to fetch livescore from TheSportsDB");
+        return Results.Problem("Failed to fetch livescore from Sportarr API");
     }
 });
 
@@ -12660,7 +12659,7 @@ app.MapPost("/api/v3/command", async (HttpContext context, SportarrDbContext db,
 });
 
 // GET /api/v3/series - Get series list (Sonarr v3 API for Decypharr/Maintainerr)
-// Supports ?tvdbId={id} query parameter for lookup by TheSportsDB ID
+// Supports ?tvdbId={id} query parameter for lookup by Sportarr API external ID
 app.MapGet("/api/v3/series", async (SportarrDbContext db, ILogger<Program> logger, int? tvdbId) =>
 {
     logger.LogInformation("[SONARR-V3] GET /api/v3/series - tvdbId={TvdbId}", tvdbId);
