@@ -1076,9 +1076,11 @@ public class LibraryImportService
     {
         int confidence = 0;
 
-        // ── ROUND NUMBER (highest priority — like S/E in Sonarr) ────────────────
-        // If the filename has a round number, it's the primary identifier.
-        // A round match gives a large bonus; a round mismatch is an immediate rejection.
+        // ── ROUND NUMBER ────────────────────────────────────────────────────────
+        // Round match = strong bonus. Mismatch = significant penalty (not rejection),
+        // because some sports use cumulative episode numbers that don't align with
+        // per-season round numbers. We only penalise when episode numbers look
+        // per-season (≤ 100) to avoid breaking sports with cumulative numbering.
         if (parsedRoundNumber.HasValue && evt.EpisodeNumber.HasValue)
         {
             if (evt.EpisodeNumber.Value == parsedRoundNumber.Value)
@@ -1086,22 +1088,25 @@ public class LibraryImportService
                 confidence += 50;
                 _logger.LogDebug("[Match] Round {Round} matches EpisodeNumber for '{Event}'", parsedRoundNumber.Value, eventTitle);
             }
-            else
+            else if (evt.EpisodeNumber.Value <= 100)
             {
-                _logger.LogDebug("[Match] Round mismatch: file round {FileRound} vs event episode {EventEp} for '{Event}'",
+                // Per-season numbering likely — penalise the mismatch
+                confidence -= 25;
+                _logger.LogDebug("[Match] Round mismatch: file round {FileRound} vs event episode {EventEp} for '{Event}' (penalising)",
                     parsedRoundNumber.Value, evt.EpisodeNumber.Value, eventTitle);
-                return 0; // Wrong round — definitely wrong event
             }
+            // If EpisodeNumber > 100 it's likely cumulative numbering — no penalty
         }
 
         // ── EXPLICIT S/E EPISODE NUMBER ─────────────────────────────────────────
-        // Files with S2025E05 in the name — episode number is authoritative
+        // Files with S2025E05 in the name — this IS authoritative since it's the
+        // Sportarr season/episode format used in library filenames.
         if (explicitEpisodeNumber.HasValue && evt.EpisodeNumber.HasValue)
         {
             if (evt.EpisodeNumber.Value == explicitEpisodeNumber.Value)
                 confidence += 50;
             else
-                return 0; // Episode number mismatch — wrong event
+                return 0; // S/E notation is authoritative — wrong event
         }
 
         // ── YEAR / SEASON CHECK ─────────────────────────────────────────────────
