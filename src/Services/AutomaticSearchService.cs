@@ -213,6 +213,26 @@ public class AutomaticSearchService : IAutomaticSearchService
             await _db.Entry(evt).Reference(e => e.AwayTeam).LoadAsync();
             await _db.Entry(evt).Reference(e => e.League).LoadAsync();
 
+            // Resolve quality profile BEFORE searching so custom formats are applied during evaluation
+            // Without this, cached and live search results skip custom format scoring entirely
+            // Fallback chain: provided ID → event's profile → league's profile → default
+            if (!qualityProfileId.HasValue)
+            {
+                if (evt.QualityProfileId.HasValue)
+                {
+                    qualityProfileId = evt.QualityProfileId.Value;
+                }
+                else if (evt.League?.QualityProfileId != null)
+                {
+                    qualityProfileId = evt.League.QualityProfileId.Value;
+                }
+                else
+                {
+                    var defaultProfile = await _db.QualityProfiles.OrderBy(q => q.Id).FirstOrDefaultAsync();
+                    qualityProfileId = defaultProfile?.Id;
+                }
+            }
+
             // Build queries WITH the part included for accurate results
             // Indexers return different results: "UFC 299" vs "UFC 299 Prelims"
             // Pass league's custom search template if available

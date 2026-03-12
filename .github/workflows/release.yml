@@ -139,7 +139,9 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: |
+            8.0.x
+            9.0.x
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -211,20 +213,32 @@ jobs:
         id: jellyfin_plugin
         run: |
           cd agents/jellyfin/Sportarr
+          VERSION="${{ steps.bump_version.outputs.version_number }}"
           # Update version in csproj
           sed -i "s/<Version>.*<\/Version>/<Version>${{ steps.bump_version.outputs.base_version }}<\/Version>/" Sportarr.csproj
-          sed -i "s/<AssemblyVersion>.*<\/AssemblyVersion>/<AssemblyVersion>${{ steps.bump_version.outputs.version_number }}<\/AssemblyVersion>/" Sportarr.csproj
-          sed -i "s/<FileVersion>.*<\/FileVersion>/<FileVersion>${{ steps.bump_version.outputs.version_number }}<\/FileVersion>/" Sportarr.csproj
+          sed -i "s/<AssemblyVersion>.*<\/AssemblyVersion>/<AssemblyVersion>${VERSION}<\/AssemblyVersion>/" Sportarr.csproj
+          sed -i "s/<FileVersion>.*<\/FileVersion>/<FileVersion>${VERSION}<\/FileVersion>/" Sportarr.csproj
+          # Update meta.json with current version and timestamp
+          python3 -c "
+          import json
+          with open('meta.json', 'r') as f:
+            meta = json.load(f)
+          meta['version'] = '${VERSION}'
+          meta['timestamp'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+          with open('meta.json', 'w') as f:
+            json.dump(meta, f, indent=2)
+            f.write('\n')
+          "
           dotnet restore
           dotnet publish -c Release -o publish
-          # Package plugin
+          # Package plugin (include meta.json for Jellyfin 10.11+ plugin discovery)
           cd publish
-          zip -j ../sportarr-jellyfin-plugin_${{ steps.bump_version.outputs.version_number }}.zip Jellyfin.Plugin.Sportarr.dll
+          zip -j ../sportarr-jellyfin-plugin_${VERSION}.zip Jellyfin.Plugin.Sportarr.dll meta.json
           cd ..
           # Calculate checksum
-          CHECKSUM=$(md5sum sportarr-jellyfin-plugin_${{ steps.bump_version.outputs.version_number }}.zip | cut -d' ' -f1)
+          CHECKSUM=$(md5sum sportarr-jellyfin-plugin_${VERSION}.zip | cut -d' ' -f1)
           echo "checksum=${CHECKSUM}" >> $GITHUB_OUTPUT
-          mv sportarr-jellyfin-plugin_${{ steps.bump_version.outputs.version_number }}.zip ../../../
+          mv sportarr-jellyfin-plugin_${VERSION}.zip ../../../
 
       - name: Update Jellyfin Plugin Manifest
         run: |
@@ -360,7 +374,18 @@ jobs:
           RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.bump_version.outputs.version }}
         run: |
           VERSION_NUMBER="${{ steps.bump_version.outputs.version_number }}"
-          DESCRIPTION="**[View Release](${RELEASE_URL})**\n\n**Docker Installation**\n\`\`\`\ndocker pull sportarr/sportarr:latest\ndocker pull sportarr/sportarr:${VERSION_NUMBER}\n\`\`\`"
+          # Format release notes for Discord embed
+          RELEASE_SUMMARY=$(python3 -c "
+          lines = open('release_notes.md').read().strip().split('\n')
+          out = []
+          for line in lines:
+            if line.startswith('### '):
+              out.append('**' + line[4:] + '**')
+            elif line.strip():
+              out.append(line)
+          print('\n'.join(out[:20]))
+          " | sed 's/"/\\"/g')
+          DESCRIPTION="${RELEASE_SUMMARY}\n\n**Docker Installation**\n\`\`\`\ndocker pull sportarr/sportarr:latest\ndocker pull sportarr/sportarr:${VERSION_NUMBER}\n\`\`\`\n\n**Downloads**\n[View all platform downloads](${RELEASE_URL})"
 
           curl -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \

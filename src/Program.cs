@@ -18,6 +18,9 @@ using Sportarr.Windows;
 using System.Windows.Forms;
 #endif
 
+// Use system SQLite library instead of bundled e_sqlite3 (avoids "invalid opcode" on older CPUs)
+SQLitePCL.Batteries_V2.Init();
+
 // Set default environment variables (same as Docker sets, for consistency outside Docker)
 // These can still be overridden by the user if needed
 Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT",
@@ -634,6 +637,25 @@ try
         catch (Exception ex)
         {
             Console.WriteLine($"[Sportarr] Warning: Could not verify DownloadQueue.ImportRetryCount column: {ex.Message}");
+        }
+
+        // Ensure IndexerId column exists in DownloadQueue table (backwards compatibility fix)
+        // This column was added for seed config lookup but may be missing on older databases
+        try
+        {
+            var checkIndexerIdColumnSql = "SELECT COUNT(*) FROM pragma_table_info('DownloadQueue') WHERE name='IndexerId'";
+            var indexerIdColumnExists = db.Database.SqlQueryRaw<int>(checkIndexerIdColumnSql).AsEnumerable().FirstOrDefault();
+
+            if (indexerIdColumnExists == 0)
+            {
+                Console.WriteLine("[Sportarr] DownloadQueue.IndexerId column missing - adding it now...");
+                db.Database.ExecuteSqlRaw("ALTER TABLE DownloadQueue ADD COLUMN IndexerId INTEGER NULL");
+                Console.WriteLine("[Sportarr] DownloadQueue.IndexerId column added successfully");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Sportarr] Warning: Could not verify DownloadQueue.IndexerId column: {ex.Message}");
         }
 
         // Remove deprecated UseSymlinks column from MediaManagementSettings if it exists

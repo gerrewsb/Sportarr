@@ -21,8 +21,7 @@ public class PackImportService
     private readonly SportarrApiClient _sportarrApiClient;
     private readonly ILogger<PackImportService> _logger;
 
-    // Supported video file extensions
-    private static readonly string[] VideoExtensions = { ".mkv", ".mp4", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".ts" };
+    private static readonly string[] VideoExtensions = SupportedExtensions.Video;
 
     public PackImportService(
         SportarrDbContext db,
