@@ -21,7 +21,7 @@ public class BackupService
         _db = db;
         _logger = logger;
         _configService = configService;
-        _dataDirectory = configuration["DataDirectory"] ?? "./config";
+        _dataDirectory = configuration["Sportarr:DataPath"] ?? Path.Combine(Directory.GetCurrentDirectory(), "data");
         _databasePath = Path.Combine(_dataDirectory, "sportarr.db");
     }
 
