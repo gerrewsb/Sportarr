@@ -72,4 +72,8 @@
     <None Include="..\agents\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="agents" />
   </ItemGroup>
 
+	<ItemGroup>
+		<InternalsVisibleTo Include="Spartarr.Api.Tests"/>
+	</ItemGroup>
+
 </Project>

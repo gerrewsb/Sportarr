@@ -1,6 +1,7 @@
+using Microsoft.EntityFrameworkCore;
 using Sportarr.Api.Data;
 using Sportarr.Api.Models;
-using Microsoft.EntityFrameworkCore;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Services;
 
@@ -62,7 +63,7 @@ public class EnhancedDownloadMonitorService : BackgroundService
         _logger.LogInformation("[Enhanced Download Monitor] Service stopped");
     }
 
-    private async Task MonitorDownloadsAsync(CancellationToken cancellationToken)
+    internal async Task MonitorDownloadsAsync(CancellationToken cancellationToken)
     {
         using var scope = _serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SportarrDbContext>();
@@ -132,8 +133,7 @@ public class EnhancedDownloadMonitorService : BackgroundService
         }
     }
 
-    private async Task ProcessDownloadAsync(
-        DownloadQueueItem download,
+    internal async Task ProcessDownloadAsync(DownloadQueueItem download,
         DownloadClientService downloadClientService,
         FileImportService fileImportService,
         SportarrDbContext db,
@@ -168,55 +168,13 @@ public class EnhancedDownloadMonitorService : BackgroundService
         var status = await downloadClientService.GetDownloadStatusAsync(
             download.DownloadClient,
             download.DownloadId);
-
+        
         if (status == null)
         {
-            // Download not found by ID - try finding by title (Decypharr/debrid proxy compatibility)
-            // Debrid proxies may change the download ID/hash after processing
-            _logger.LogDebug("[Enhanced Download Monitor] Download not found by ID {DownloadId}, trying title match for: {Title}",
-                download.DownloadId, download.Title);
+            (status, bool shouldReturn) = await HandleDownloadWithoutStatus(download, downloadClientService, db);
 
-            var (titleMatchStatus, newDownloadId) = await downloadClientService.FindDownloadByTitleAsync(
-                download.DownloadClient,
-                download.Title,
-                download.DownloadClient.Category);
-
-            if (titleMatchStatus != null && newDownloadId != null)
+            if (shouldReturn)
             {
-                _logger.LogInformation("[Enhanced Download Monitor] Found download by title match. Updating ID: {OldId} → {NewId}",
-                    download.DownloadId, newDownloadId);
-
-                // Update the download ID to the new one (debrid proxy changed it)
-                download.DownloadId = newDownloadId;
-                status = titleMatchStatus;
-            }
-            else
-            {
-                // Download not found in client - Sonarr behavior: auto-remove from queue
-                // This happens when user deletes from download client directly instead of through Sportarr
-                // Sonarr removes the queue item immediately when the download disappears from the client
-
-                // Track consecutive "not found" checks to avoid removing on transient issues
-                download.MissingFromClientCount = (download.MissingFromClientCount ?? 0) + 1;
-
-                if (download.MissingFromClientCount >= 3)
-                {
-                    // After 3 consecutive checks (~15 seconds), remove from queue
-                    // This matches Sonarr behavior: downloads removed from client are removed from queue
-                    _logger.LogInformation("[Enhanced Download Monitor] Download removed from client externally, removing from queue: {Title}",
-                        download.Title);
-
-                    // Remove from queue (Sonarr-style auto-cleanup)
-                    db.DownloadQueue.Remove(download);
-                    await db.SaveChangesAsync();
-                    return;
-                }
-                else
-                {
-                    // First few "not found" - could be transient, log at debug level
-                    _logger.LogDebug("[Enhanced Download Monitor] Download not found in client (check {Count}/3): {Title}",
-                        download.MissingFromClientCount, download.Title);
-                }
                 return;
             }
         }
@@ -228,7 +186,7 @@ public class EnhancedDownloadMonitorService : BackgroundService
         var previousStatus = download.Status;
         var previousProgress = download.Progress;
 
-        download.Progress = status.Progress;
+        download.Progress = status!.Progress;
         download.Downloaded = status.Downloaded;
         download.Size = status.Size;
         download.TimeRemaining = status.TimeRemaining;
@@ -316,7 +274,7 @@ public class EnhancedDownloadMonitorService : BackgroundService
         // Detect stalled downloads
         if (download.Status == DownloadStatus.Downloading)
         {
-            CheckForStalledDownload(download, previousProgress, db);
+            CheckForStalledDownload(download, previousProgress);
         }
 
         // Handle completed downloads
@@ -346,11 +304,62 @@ public class EnhancedDownloadMonitorService : BackgroundService
                 redownloadFailedFromInteractive);
         }
     }
-
-    private void CheckForStalledDownload(
-        DownloadQueueItem download,
-        double previousProgress,
+    
+    internal async Task<(DownloadClientStatus? status, bool shouldReturn)> HandleDownloadWithoutStatus(DownloadQueueItem download,
+        DownloadClientService downloadClientService,
         SportarrDbContext db)
+    {
+        // Download not found by ID - try finding by title (Decypharr/debrid proxy compatibility)
+        // Debrid proxies may change the download ID/hash after processing
+        _logger.LogDebug("[Enhanced Download Monitor] Download not found by ID {DownloadId}, trying title match for: {Title}",
+            download.DownloadId, download.Title);
+
+        (DownloadClientStatus? titleMatchStatus, string? newDownloadId) = await downloadClientService.FindDownloadByTitleAsync(
+            download.DownloadClient!,
+            download.Title,
+            download.DownloadClient!.Category);
+
+        if (titleMatchStatus != null && !string.IsNullOrWhiteSpace(newDownloadId))
+        {
+            _logger.LogInformation("[Enhanced Download Monitor] Found download by title match. Updating ID: {OldId} → {NewId}",
+                download.DownloadId, newDownloadId);
+
+            // Update the download ID to the new one (debrid proxy changed it)
+            download.DownloadId = newDownloadId;
+            return (titleMatchStatus, false);
+        }
+        else
+        {
+            // Download not found in client - Sonarr behavior: auto-remove from queue
+            // This happens when user deletes from download client directly instead of through Sportarr
+            // Sonarr removes the queue item immediately when the download disappears from the client
+            // Track consecutive "not found" checks to avoid removing on transient issues
+            download.MissingFromClientCount = (download.MissingFromClientCount ?? 0) + 1;
+
+            if (download.MissingFromClientCount >= 3)
+            {
+                // After 3 consecutive checks (~15 seconds), remove from queue
+                // This matches Sonarr behavior: downloads removed from client are removed from queue
+                _logger.LogInformation("[Enhanced Download Monitor] Download removed from client externally, removing from queue: {Title}",
+                    download.Title);
+
+                // Remove from queue (Sonarr-style auto-cleanup)
+                db.DownloadQueue.Remove(download);
+                await db.SaveChangesAsync();
+                return (null , true);
+            }
+            else
+            {
+                // First few "not found" - could be transient, log at debug level
+                _logger.LogDebug("[Enhanced Download Monitor] Download not found in client (check {Count}/3): {Title}",
+                    download.MissingFromClientCount, download.Title);
+            }
+
+            return (null, true);
+        }
+    }
+
+    private void CheckForStalledDownload(DownloadQueueItem download, double previousProgress)
     {
         // If progress hasn't changed and we've been downloading for a while
         if (Math.Abs(download.Progress - previousProgress) < 0.1 && download.Added < DateTime.UtcNow - _stalledTimeout)
