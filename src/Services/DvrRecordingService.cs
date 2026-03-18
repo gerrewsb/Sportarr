@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sportarr.Api.Data;
 using Sportarr.Api.Models;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Services;
 
@@ -14,7 +15,7 @@ public class DvrRecordingService
     private readonly SportarrDbContext _db;
     private readonly FFmpegRecorderService _ffmpegRecorder;
     private readonly IptvSourceService _iptvService;
-    private readonly ConfigService _configService;
+    private readonly IConfigService _configService;
     private readonly FileNamingService _namingService;
 
     public DvrRecordingService(
@@ -22,7 +23,7 @@ public class DvrRecordingService
         SportarrDbContext db,
         FFmpegRecorderService ffmpegRecorder,
         IptvSourceService iptvService,
-        ConfigService configService,
+        IConfigService configService,
         FileNamingService namingService)
     {
         _logger = logger;

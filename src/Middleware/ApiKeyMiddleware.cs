@@ -1,6 +1,6 @@
+using Sportarr.Api.Services.Interfaces;
 using System.Security.Cryptography;
 using System.Text;
-using Sportarr.Api.Services;
 
 namespace Sportarr.Api.Middleware;
 
@@ -14,7 +14,7 @@ public class ApiKeyMiddleware
         _next = next;
     }
 
-    public async Task InvokeAsync(HttpContext context, ConfigService configService)
+    public async Task InvokeAsync(HttpContext context, IConfigService configService)
     {
         // Allow unauthenticated access to:
         // - Static files (UI assets)

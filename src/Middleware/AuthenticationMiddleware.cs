@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Sportarr.Api.Services;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Middleware;
 
@@ -15,7 +16,7 @@ public class AuthenticationMiddleware
         _next = next;
     }
 
-    public async Task InvokeAsync(HttpContext context, AuthenticationService authService, ConfigService configService)
+    public async Task InvokeAsync(HttpContext context, AuthenticationService authService, IConfigService configService)
     {
         var path = context.Request.Path.Value?.ToLower() ?? string.Empty;
 

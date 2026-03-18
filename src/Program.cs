@@ -13,6 +13,8 @@ using System.Text.Json;
 using Polly;
 using Polly.Extensions.Http;
 using System.Runtime.InteropServices;
+using Sportarr.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Authentication;
 #if WINDOWS
 using Sportarr.Windows;
 using System.Windows.Forms;
@@ -247,7 +249,7 @@ builder.Services.AddHttpClient("DownloadClientSkipSsl")
     });
 
 // Register DownloadClientService - uses IHttpClientFactory for proper HttpClient lifecycle management
-builder.Services.AddScoped<Sportarr.Api.Services.DownloadClientService>();
+builder.Services.AddScoped<IDownloadClientService, DownloadClientService>();
 
 // Configure HttpClient for TRaSH Guides GitHub API with proper User-Agent
 builder.Services.AddHttpClient("TrashGuides")
@@ -337,55 +339,53 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     // DO NOT add JsonStringEnumConverter - we need numeric enum values for frontend
     // The frontend expects type: 5 (number), not type: "Sabnzbd" (string)
 });
-builder.Services.AddSingleton<Sportarr.Api.Services.ConfigService>();
-builder.Services.AddScoped<Sportarr.Api.Services.UserService>();
+builder.Services.AddSingleton<IConfigService, ConfigService>();
+builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<Sportarr.Api.Services.AuthenticationService>();
-builder.Services.AddScoped<Sportarr.Api.Services.SimpleAuthService>();
-builder.Services.AddScoped<Sportarr.Api.Services.SessionService>();
-// Note: DownloadClientService is registered above as Scoped with IHttpClientFactory pattern
-builder.Services.AddScoped<Sportarr.Api.Services.IndexerStatusService>(); // Sonarr-style indexer health tracking and backoff
-builder.Services.AddScoped<Sportarr.Api.Services.IndexerSearchService>();
-builder.Services.AddScoped<Sportarr.Api.Services.ReleaseMatchingService>(); // Sonarr-style release validation to prevent downloading wrong content
-builder.Services.AddSingleton<Sportarr.Api.Services.ReleaseMatchScorer>(); // Match scoring for event-to-release matching
-builder.Services.AddScoped<Sportarr.Api.Services.ReleaseCacheService>(); // Local release cache for RSS-first search strategy
-builder.Services.AddSingleton<Sportarr.Api.Services.SearchQueueService>(); // Queue for parallel search execution
-builder.Services.AddSingleton<Sportarr.Api.Services.SearchResultCache>(); // In-memory cache for raw indexer results (reduces API calls)
-builder.Services.AddSingleton<Sportarr.Api.Services.CustomFormatMatchCache>(); // In-memory cache for CF match results (avoids repeated regex evaluation)
-builder.Services.AddScoped<Sportarr.Api.Services.AutomaticSearchService>();
-builder.Services.AddScoped<Sportarr.Api.Services.DelayProfileService>();
-builder.Services.AddScoped<Sportarr.Api.Services.QualityDetectionService>();
-builder.Services.AddScoped<Sportarr.Api.Services.ReleaseEvaluator>();
-builder.Services.AddScoped<Sportarr.Api.Services.ReleaseProfileService>(); // Release profile keyword filtering (Sonarr-style)
-builder.Services.AddScoped<Sportarr.Api.Services.MediaFileParser>();
-builder.Services.AddScoped<Sportarr.Api.Services.SportsFileNameParser>(); // Sports-specific filename parsing (UFC, WWE, NFL, etc.)
-builder.Services.AddScoped<Sportarr.Api.Services.FileNamingService>();
-builder.Services.AddScoped<Sportarr.Api.Services.FileRenameService>(); // Auto-renames files when event metadata changes
-builder.Services.AddScoped<Sportarr.Api.Services.EventPartDetector>(); // Multi-part episode detection for Fighting sports
-builder.Services.AddScoped<Sportarr.Api.Services.FileFormatManager>(); // Auto-manages {Part} token in file format
-builder.Services.AddScoped<Sportarr.Api.Services.FileImportService>();
-builder.Services.AddScoped<Sportarr.Api.Services.ImportMatchingService>(); // Matches external downloads to events
-builder.Services.AddScoped<Sportarr.Api.Services.CustomFormatService>();
-builder.Services.AddScoped<Sportarr.Api.Services.TrashGuideSyncService>(); // TRaSH Guides sync for custom formats and scores
-builder.Services.AddHostedService<Sportarr.Api.Services.TrashSyncBackgroundService>(); // TRaSH Guides auto-sync background service
-builder.Services.AddSingleton<Sportarr.Api.Services.DiskSpaceService>(); // Disk space detection (handles Docker volumes correctly)
-builder.Services.AddScoped<Sportarr.Api.Services.HealthCheckService>();
-builder.Services.AddScoped<Sportarr.Api.Services.BackupService>();
-builder.Services.AddScoped<Sportarr.Api.Services.LibraryImportService>();
-builder.Services.AddScoped<Sportarr.Api.Services.NotificationService>(); // Multi-provider notifications (Discord, Telegram, Pushover, Plex, Jellyfin, Emby, etc.)
-builder.Services.AddScoped<Sportarr.Api.Services.ImportListService>();
-// ImportService removed - CompletedDownloadHandlingService now uses FileImportService which has proper folder structure with episode numbers
-builder.Services.AddScoped<Sportarr.Api.Services.ProvideImportItemService>(); // Provides import items with path translation
-builder.Services.AddScoped<Sportarr.Api.Services.EventQueryService>(); // Universal: Sport-aware query builder for all sports
-builder.Services.AddScoped<Sportarr.Api.Services.LeagueEventSyncService>(); // Syncs events from Sportarr API to populate leagues
-builder.Services.AddScoped<Sportarr.Api.Services.TeamLeagueDiscoveryService>(); // Discovers leagues for followed teams (cross-league team monitoring)
-builder.Services.AddScoped<Sportarr.Api.Services.SeasonSearchService>(); // Season-level search for manual season pack discovery
-builder.Services.AddScoped<Sportarr.Api.Services.EventMappingService>(); // Event mapping sync and lookup for release name matching
-builder.Services.AddScoped<Sportarr.Api.Services.PackImportService>(); // Multi-file pack import (e.g., NFL-2025-Week15 containing all games)
-builder.Services.AddHostedService<Sportarr.Api.Services.EventMappingSyncBackgroundService>(); // Automatic event mapping sync every 12 hours (like Sonarr XEM)
-builder.Services.AddHostedService<Sportarr.Api.Services.LeagueEventAutoSyncService>(); // Background service for automatic periodic event sync
+builder.Services.AddScoped<SimpleAuthService>();
+builder.Services.AddScoped<SessionService>();
+builder.Services.AddScoped<IndexerStatusService>(); // Sonarr-style indexer health tracking and backoff
+builder.Services.AddScoped<IIndexerSearchService, IndexerSearchService>();
+builder.Services.AddScoped<ReleaseMatchingService>(); // Sonarr-style release validation to prevent downloading wrong content
+builder.Services.AddSingleton<ReleaseMatchScorer>(); // Match scoring for event-to-release matching
+builder.Services.AddScoped<ReleaseCacheService>(); // Local release cache for RSS-first search strategy
+builder.Services.AddSingleton<SearchQueueService>(); // Queue for parallel search execution
+builder.Services.AddSingleton<SearchResultCache>(); // In-memory cache for raw indexer results (reduces API calls)
+builder.Services.AddSingleton<CustomFormatMatchCache>(); // In-memory cache for CF match results (avoids repeated regex evaluation)
+builder.Services.AddScoped<IAutomaticSearchService, AutomaticSearchService>();
+builder.Services.AddScoped<DelayProfileService>();
+builder.Services.AddScoped<QualityDetectionService>();
+builder.Services.AddScoped<ReleaseEvaluator>();
+builder.Services.AddScoped<ReleaseProfileService>(); // Release profile keyword filtering (Sonarr-style)
+builder.Services.AddScoped<MediaFileParser>();
+builder.Services.AddScoped<SportsFileNameParser>(); // Sports-specific filename parsing (UFC, WWE, NFL, etc.)
+builder.Services.AddScoped<FileNamingService>();
+builder.Services.AddScoped<FileRenameService>(); // Auto-renames files when event metadata changes
+builder.Services.AddScoped<EventPartDetector>(); // Multi-part episode detection for Fighting sports
+builder.Services.AddScoped<FileFormatManager>(); // Auto-manages {Part} token in file format
+builder.Services.AddScoped<IFileImportService, FileImportService>();
+builder.Services.AddScoped<ImportMatchingService>(); // Matches external downloads to events
+builder.Services.AddScoped<CustomFormatService>();
+builder.Services.AddScoped<TrashGuideSyncService>(); // TRaSH Guides sync for custom formats and scores
+builder.Services.AddHostedService<TrashSyncBackgroundService>(); // TRaSH Guides auto-sync background service
+builder.Services.AddSingleton<DiskSpaceService>(); // Disk space detection (handles Docker volumes correctly)
+builder.Services.AddScoped<HealthCheckService>();
+builder.Services.AddScoped<BackupService>();
+builder.Services.AddScoped<LibraryImportService>();
+builder.Services.AddScoped<INotificationService, NotificationService>(); // Multi-provider notifications (Discord, Telegram, Pushover, Plex, Jellyfin, Emby, etc.)
+builder.Services.AddScoped<ImportListService>();
+builder.Services.AddScoped<ProvideImportItemService>(); // Provides import items with path translation
+builder.Services.AddScoped<EventQueryService>(); // Universal: Sport-aware query builder for all sports
+builder.Services.AddScoped<LeagueEventSyncService>(); // Syncs events from Sportarr API to populate leagues
+builder.Services.AddScoped<TeamLeagueDiscoveryService>(); // Discovers leagues for followed teams (cross-league team monitoring)
+builder.Services.AddScoped<SeasonSearchService>(); // Season-level search for manual season pack discovery
+builder.Services.AddScoped<EventMappingService>(); // Event mapping sync and lookup for release name matching
+builder.Services.AddScoped<PackImportService>(); // Multi-file pack import (e.g., NFL-2025-Week15 containing all games)
+builder.Services.AddHostedService<EventMappingSyncBackgroundService>(); // Automatic event mapping sync every 12 hours (like Sonarr XEM)
+builder.Services.AddHostedService<LeagueEventAutoSyncService>(); // Background service for automatic periodic event sync
 
 // Sportarr API client for sports metadata (sportarr.net)
-builder.Services.AddHttpClient<Sportarr.Api.Services.SportarrApiClient>()
+builder.Services.AddHttpClient<SportarrApiClient>()
     .AddTransientHttpErrorPolicy(policyBuilder =>
         policyBuilder.WaitAndRetryAsync(
             retryCount: 3,
@@ -396,31 +396,31 @@ builder.Services.AddHttpClient<Sportarr.Api.Services.SportarrApiClient>()
             }
         ));
 
-builder.Services.AddSingleton<Sportarr.Api.Services.TaskService>();
-builder.Services.AddHostedService<Sportarr.Api.Services.EnhancedDownloadMonitorService>(); // Unified download monitoring with retry, blocklist, and auto-import
-builder.Services.AddHostedService<Sportarr.Api.Services.RssSyncService>(); // Automatic RSS sync for new releases
-builder.Services.AddHostedService<Sportarr.Api.Services.TvScheduleSyncService>(); // TV schedule sync for automatic search timing
-builder.Services.AddSingleton<Sportarr.Api.Services.DiskScanService>(); // Periodic file existence verification (Sonarr-style disk scan)
-builder.Services.AddHostedService<Sportarr.Api.Services.DiskScanService>(sp => sp.GetRequiredService<Sportarr.Api.Services.DiskScanService>());
-builder.Services.AddHostedService<Sportarr.Api.Services.FileWatcherService>(); // Real-time file monitoring via FileSystemWatcher
+builder.Services.AddSingleton<ITaskService, TaskService>();
+builder.Services.AddHostedService<EnhancedDownloadMonitorService>(); // Unified download monitoring with retry, blocklist, and auto-import
+builder.Services.AddHostedService<RssSyncService>(); // Automatic RSS sync for new releases
+builder.Services.AddHostedService<TvScheduleSyncService>(); // TV schedule sync for automatic search timing
+builder.Services.AddSingleton<DiskScanService>(); // Periodic file existence verification (Sonarr-style disk scan)
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DiskScanService>());
+builder.Services.AddHostedService<FileWatcherService>(); // Real-time file monitoring via FileSystemWatcher
 
 // IPTV/DVR services for recording live streams
-builder.Services.AddScoped<Sportarr.Api.Services.M3uParserService>();
-builder.Services.AddScoped<Sportarr.Api.Services.XtreamCodesClient>();
-builder.Services.AddScoped<Sportarr.Api.Services.IptvSourceService>();
-builder.Services.AddScoped<Sportarr.Api.Services.ChannelAutoMappingService>();
-builder.Services.AddSingleton<Sportarr.Api.Services.FFmpegRecorderService>();
-builder.Services.AddSingleton<Sportarr.Api.Services.FFmpegStreamService>(); // Live stream transcoding service
-builder.Services.AddScoped<Sportarr.Api.Services.DvrRecordingService>();
-builder.Services.AddScoped<Sportarr.Api.Services.EventDvrService>();
-builder.Services.AddHostedService<Sportarr.Api.Services.DvrSchedulerService>();
-builder.Services.AddSingleton<Sportarr.Api.Services.DvrAutoSchedulerService>(); // DVR auto-scheduling service (singleton for background + manual trigger)
-builder.Services.AddHostedService(sp => sp.GetRequiredService<Sportarr.Api.Services.DvrAutoSchedulerService>()); // Run as hosted service
-builder.Services.AddScoped<Sportarr.Api.Services.DvrQualityScoreCalculator>(); // DVR quality score estimation
-builder.Services.AddScoped<Sportarr.Api.Services.XmltvParserService>(); // XMLTV EPG parser
-builder.Services.AddScoped<Sportarr.Api.Services.EpgService>(); // EPG management service
-builder.Services.AddScoped<Sportarr.Api.Services.EpgSchedulingService>(); // EPG-based DVR scheduling optimization
-builder.Services.AddScoped<Sportarr.Api.Services.FilteredExportService>(); // Filtered M3U/EPG export service
+builder.Services.AddScoped<M3uParserService>();
+builder.Services.AddScoped<XtreamCodesClient>();
+builder.Services.AddScoped<IptvSourceService>();
+builder.Services.AddScoped<ChannelAutoMappingService>();
+builder.Services.AddSingleton<FFmpegRecorderService>();
+builder.Services.AddSingleton<FFmpegStreamService>(); // Live stream transcoding service
+builder.Services.AddScoped<DvrRecordingService>();
+builder.Services.AddScoped<EventDvrService>();
+builder.Services.AddHostedService<DvrSchedulerService>();
+builder.Services.AddSingleton<DvrAutoSchedulerService>(); // DVR auto-scheduling service (singleton for background + manual trigger)
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DvrAutoSchedulerService>()); // Run as hosted service
+builder.Services.AddScoped<DvrQualityScoreCalculator>(); // DVR quality score estimation
+builder.Services.AddScoped<XmltvParserService>(); // XMLTV EPG parser
+builder.Services.AddScoped<EpgService>(); // EPG management service
+builder.Services.AddScoped<EpgSchedulingService>(); // EPG-based DVR scheduling optimization
+builder.Services.AddScoped<FilteredExportService>(); // Filtered M3U/EPG export service
 
 // Add ASP.NET Core Authentication (Sonarr/Radarr pattern)
 Sportarr.Api.Authentication.AuthenticationBuilderExtensions.AddAppAuthentication(builder.Services);
@@ -1399,8 +1399,8 @@ try
     // Ensure file format matches EnableMultiPartEpisodes setting
     using (var scope = app.Services.CreateScope())
     {
-        var fileFormatManager = scope.ServiceProvider.GetRequiredService<Sportarr.Api.Services.FileFormatManager>();
-        var configService = scope.ServiceProvider.GetRequiredService<Sportarr.Api.Services.ConfigService>();
+        var fileFormatManager = scope.ServiceProvider.GetRequiredService<FileFormatManager>();
+        var configService = scope.ServiceProvider.GetRequiredService<IConfigService>();
         var config = await configService.GetConfigAsync();
         await fileFormatManager.EnsureFileFormatMatchesMultiPartSetting(config.EnableMultiPartEpisodes);
         Console.WriteLine($"[Sportarr] File format verified (EnableMultiPartEpisodes={config.EnableMultiPartEpisodes})");
@@ -1412,7 +1412,7 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<SportarrDbContext>();
-        var configService = scope.ServiceProvider.GetRequiredService<Sportarr.Api.Services.ConfigService>();
+        var configService = scope.ServiceProvider.GetRequiredService<IConfigService>();
         var config = await configService.GetConfigAsync();
 
         Console.WriteLine($"[Sportarr] Syncing SecuritySettings to database (AuthMethod={config.AuthenticationMethod}, AuthRequired={config.AuthenticationRequired})");
@@ -1648,7 +1648,7 @@ See `jellyfin/README.md` for Jellyfin plugin instructions.
 // Must be configured early in the pipeline, before routing
 string configuredUrlBase = "";
 {
-    var configService = app.Services.GetRequiredService<Sportarr.Api.Services.ConfigService>();
+    var configService = app.Services.GetRequiredService<IConfigService>();
     var config = configService.GetConfigAsync().GetAwaiter().GetResult();
     configuredUrlBase = config.UrlBase?.Trim() ?? "";
     if (!string.IsNullOrEmpty(configuredUrlBase))
@@ -1741,7 +1741,7 @@ app.Use(async (context, next) =>
             var html = await File.ReadAllTextAsync(indexPath);
 
             // Get the configured URL base
-            var configService = context.RequestServices.GetRequiredService<Sportarr.Api.Services.ConfigService>();
+            var configService = context.RequestServices.GetRequiredService<IConfigService>();
             var config = await configService.GetConfigAsync();
             var urlBase = config.UrlBase?.Trim() ?? "";
             if (!string.IsNullOrEmpty(urlBase))
@@ -1775,7 +1775,7 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 // Initialize endpoint (for frontend) - keep for SPA compatibility
-app.MapGet("/initialize.json", async (Sportarr.Api.Services.ConfigService configService) =>
+app.MapGet("/initialize.json", async (IConfigService configService) =>
 {
     // Get API key from config.xml (same source that authentication uses)
     var config = await configService.GetConfigAsync();
@@ -1947,7 +1947,7 @@ app.MapGet("/api/auth/check", async (
 // Users configure authentication via Settings > General > Security
 
 // API: System Status
-app.MapGet("/api/system/status", async (Sportarr.Api.Services.ConfigService configService) =>
+app.MapGet("/api/system/status", async (IConfigService configService) =>
 {
     var config = await configService.GetConfigAsync();
     var status = new SystemStatus
@@ -2706,7 +2706,7 @@ app.MapGet("/api/library/leagues/{leagueId:int}/seasons", async (
 app.MapGet("/api/library/leagues/{leagueId:int}/events", async (
     int leagueId,
     SportarrDbContext db,
-    Sportarr.Api.Services.ConfigService configService,
+    IConfigService configService,
     string? season = null,
     string? search = null,
     int limit = 100) =>
@@ -2927,7 +2927,7 @@ app.MapGet("/api/log/file/download", (string filename, ILogger<Program> logger) 
 });
 
 // API: Get all tasks (with optional limit)
-app.MapGet("/api/task", async (Sportarr.Api.Services.TaskService taskService, int? pageSize) =>
+app.MapGet("/api/task", async (ITaskService taskService, int? pageSize) =>
 {
     try
     {
@@ -2942,7 +2942,7 @@ app.MapGet("/api/task", async (Sportarr.Api.Services.TaskService taskService, in
 });
 
 // API: Get specific task
-app.MapGet("/api/task/{id:int}", async (int id, Sportarr.Api.Services.TaskService taskService) =>
+app.MapGet("/api/task/{id:int}", async (int id, ITaskService taskService) =>
 {
     try
     {
@@ -2957,7 +2957,7 @@ app.MapGet("/api/task/{id:int}", async (int id, Sportarr.Api.Services.TaskServic
 });
 
 // API: Queue a new task (for testing)
-app.MapPost("/api/task", async (Sportarr.Api.Services.TaskService taskService, TaskRequest request) =>
+app.MapPost("/api/task", async (ITaskService taskService, TaskRequest request) =>
 {
     try
     {
@@ -2977,7 +2977,7 @@ app.MapPost("/api/task", async (Sportarr.Api.Services.TaskService taskService, T
 });
 
 // API: Cancel a task
-app.MapDelete("/api/task/{id:int}", async (int id, Sportarr.Api.Services.TaskService taskService) =>
+app.MapDelete("/api/task/{id:int}", async (int id, ITaskService taskService) =>
 {
     try
     {
@@ -2996,7 +2996,7 @@ app.MapDelete("/api/task/{id:int}", async (int id, Sportarr.Api.Services.TaskSer
 });
 
 // API: Clean up old tasks
-app.MapPost("/api/task/cleanup", async (Sportarr.Api.Services.TaskService taskService, int? keepCount) =>
+app.MapPost("/api/task/cleanup", async (ITaskService taskService, int? keepCount) =>
 {
     try
     {
@@ -3217,8 +3217,8 @@ app.MapDelete("/api/events/{eventId:int}/files/{fileId:int}", async (
     string? blocklistAction,
     SportarrDbContext db,
     ILogger<Program> logger,
-    ConfigService configService,
-    AutomaticSearchService searchService) =>
+    IConfigService configService,
+    IAutomaticSearchService searchService) =>
 {
     var evt = await db.Events
         .Include(e => e.Files)
@@ -3355,8 +3355,8 @@ app.MapDelete("/api/events/{id:int}/files", async (
     string? blocklistAction,
     SportarrDbContext db,
     ILogger<Program> logger,
-    ConfigService configService,
-    AutomaticSearchService searchService) =>
+    IConfigService configService,
+    IAutomaticSearchService searchService) =>
 {
     var evt = await db.Events
         .Include(e => e.Files)
@@ -4709,7 +4709,7 @@ app.MapDelete("/api/notification/{id:int}", async (int id, SportarrDbContext db)
 });
 
 // API: Test Notification
-app.MapPost("/api/notification/{id:int}/test", async (int id, SportarrDbContext db, Sportarr.Api.Services.NotificationService notificationService) =>
+app.MapPost("/api/notification/{id:int}/test", async (int id, SportarrDbContext db, INotificationService notificationService) =>
 {
     var notification = await db.Notifications.FindAsync(id);
     if (notification is null) return Results.NotFound();
@@ -4722,7 +4722,7 @@ app.MapPost("/api/notification/{id:int}/test", async (int id, SportarrDbContext 
 });
 
 // API: Test Notification with payload (for testing before saving)
-app.MapPost("/api/notification/test", async (Notification notification, Sportarr.Api.Services.NotificationService notificationService) =>
+app.MapPost("/api/notification/test", async (Notification notification, INotificationService notificationService) =>
 {
     var (success, message) = await notificationService.TestNotificationAsync(notification);
 
@@ -4733,14 +4733,14 @@ app.MapPost("/api/notification/test", async (Notification notification, Sportarr
 
 // API: Config (lightweight endpoint for specific config values)
 // Note: Does not require authorization as it only returns non-sensitive feature flags
-app.MapGet("/api/config", async (Sportarr.Api.Services.ConfigService configService) =>
+app.MapGet("/api/config", async (IConfigService configService) =>
 {
     var config = await configService.GetConfigAsync();
     return Results.Ok(new { enableMultiPartEpisodes = config.EnableMultiPartEpisodes });
 });
 
 // API: Settings Management (using config.xml)
-app.MapGet("/api/settings", async (Sportarr.Api.Services.ConfigService configService, SportarrDbContext db, ILogger<Program> logger) =>
+app.MapGet("/api/settings", async (IConfigService configService, SportarrDbContext db, ILogger<Program> logger) =>
 {
     var config = await configService.GetConfigAsync();
     var dbMediaSettings = await db.MediaManagementSettings.FirstOrDefaultAsync();
@@ -4915,7 +4915,7 @@ app.MapGet("/api/settings", async (Sportarr.Api.Services.ConfigService configSer
     return Results.Ok(settings);
 });
 
-app.MapPut("/api/settings", async (AppSettings updatedSettings, Sportarr.Api.Services.ConfigService configService, Sportarr.Api.Services.SimpleAuthService simpleAuthService, SportarrDbContext db, Sportarr.Api.Services.FileFormatManager fileFormatManager, ILogger<Program> logger) =>
+app.MapPut("/api/settings", async (AppSettings updatedSettings, IConfigService configService, SimpleAuthService simpleAuthService, SportarrDbContext db, Sportarr.Api.Services.FileFormatManager fileFormatManager, ILogger<Program> logger) =>
 {
     logger.LogInformation("[CONFIG] Settings update requested");
     try
@@ -5311,7 +5311,7 @@ app.MapPut("/api/settings", async (AppSettings updatedSettings, Sportarr.Api.Ser
 });
 
 // API: Regenerate API Key (Sonarr pattern - no restart required)
-app.MapPost("/api/settings/apikey/regenerate", async (Sportarr.Api.Services.ConfigService configService, ILogger<Program> logger) =>
+app.MapPost("/api/settings/apikey/regenerate", async (IConfigService configService, ILogger<Program> logger) =>
 {
     logger.LogWarning("[API KEY] API key regeneration requested");
     var newApiKey = await configService.RegenerateApiKeyAsync();
@@ -5412,7 +5412,7 @@ app.MapDelete("/api/downloadclient/{id:int}", async (int id, SportarrDbContext d
 });
 
 // API: Test download client connection - supports all client types
-app.MapPost("/api/downloadclient/test", async (DownloadClient client, Sportarr.Api.Services.DownloadClientService downloadClientService) =>
+app.MapPost("/api/downloadclient/test", async (DownloadClient client, IDownloadClientService downloadClientService) =>
 {
     var (success, message) = await downloadClientService.TestConnectionAsync(client);
 
@@ -5618,8 +5618,8 @@ app.MapDelete("/api/queue/{id:int}", async (
     string removalMethod,
     string blocklistAction,
     SportarrDbContext db,
-    Sportarr.Api.Services.DownloadClientService downloadClientService,
-    Sportarr.Api.Services.SearchQueueService searchQueueService,
+    IDownloadClientService downloadClientService,
+    SearchQueueService searchQueueService,
     ILogger<Program> logger) =>
 {
     var item = await db.DownloadQueue
@@ -5730,7 +5730,7 @@ app.MapDelete("/api/queue/{id:int}", async (
 });
 
 // API: Queue Operations - Pause Download
-app.MapPost("/api/queue/{id:int}/pause", async (int id, SportarrDbContext db, Sportarr.Api.Services.DownloadClientService downloadClientService) =>
+app.MapPost("/api/queue/{id:int}/pause", async (int id, SportarrDbContext db, IDownloadClientService downloadClientService) =>
 {
     var item = await db.DownloadQueue
         .Include(dq => dq.DownloadClient)
@@ -5754,7 +5754,7 @@ app.MapPost("/api/queue/{id:int}/pause", async (int id, SportarrDbContext db, Sp
 });
 
 // API: Queue Operations - Resume Download
-app.MapPost("/api/queue/{id:int}/resume", async (int id, SportarrDbContext db, Sportarr.Api.Services.DownloadClientService downloadClientService) =>
+app.MapPost("/api/queue/{id:int}/resume", async (int id, SportarrDbContext db, IDownloadClientService downloadClientService) =>
 {
     var item = await db.DownloadQueue
         .Include(dq => dq.DownloadClient)
@@ -5778,7 +5778,7 @@ app.MapPost("/api/queue/{id:int}/resume", async (int id, SportarrDbContext db, S
 });
 
 // API: Queue Operations - Force Import
-app.MapPost("/api/queue/{id:int}/import", async (int id, SportarrDbContext db, Sportarr.Api.Services.FileImportService fileImportService) =>
+app.MapPost("/api/queue/{id:int}/import", async (int id, SportarrDbContext db, IFileImportService fileImportService) =>
 {
     var item = await db.DownloadQueue
         .Include(dq => dq.Event)
@@ -5810,7 +5810,7 @@ app.MapPost("/api/queue/{id:int}/import", async (int id, SportarrDbContext db, S
 });
 
 // API: Queue Operations - Retry Import (for failed imports)
-app.MapPost("/api/queue/{id:int}/retry", async (int id, SportarrDbContext db, Sportarr.Api.Services.FileImportService fileImportService, ILogger<Program> logger) =>
+app.MapPost("/api/queue/{id:int}/retry", async (int id, SportarrDbContext db, IFileImportService fileImportService, ILogger<Program> logger) =>
 {
     var item = await db.DownloadQueue
         .Include(dq => dq.Event)
@@ -5923,7 +5923,7 @@ app.MapPut("/api/pending-imports/{id:int}/suggestion", async (
 app.MapPost("/api/pending-imports/{id:int}/accept", async (
     int id,
     SportarrDbContext db,
-    Sportarr.Api.Services.FileImportService fileImportService) =>
+    IFileImportService fileImportService) =>
 {
     // Accept a pending import and perform the actual import
     var import = await db.PendingImports
@@ -6066,7 +6066,7 @@ app.MapDelete("/api/pending-imports/{id:int}", async (int id, SportarrDbContext 
 app.MapPost("/api/pending-imports/{id:int}/remove-from-client", async (
     int id,
     SportarrDbContext db,
-    Sportarr.Api.Services.DownloadClientService downloadClientService,
+    IDownloadClientService downloadClientService,
     ILogger<Program> logger) =>
 {
     var import = await db.PendingImports
@@ -6583,7 +6583,7 @@ app.MapGet("/api/grab-history/{id:int}", async (int id, SportarrDbContext db) =>
 app.MapPost("/api/grab-history/{id:int}/regrab", async (
     int id,
     SportarrDbContext db,
-    Sportarr.Api.Services.DownloadClientService downloadClientService,
+    IDownloadClientService downloadClientService,
     ILogger<Program> logger) =>
 {
     var grabHistory = await db.GrabHistory
@@ -6721,7 +6721,7 @@ app.MapPost("/api/grab-history/{id:int}/regrab", async (
 // Bulk re-grab missing files from history
 app.MapPost("/api/grab-history/regrab-missing", async (
     SportarrDbContext db,
-    Sportarr.Api.Services.DownloadClientService downloadClientService,
+    IDownloadClientService downloadClientService,
     ILogger<Program> logger,
     int? limit = null) =>
 {
@@ -7377,7 +7377,7 @@ app.MapPost("/api/indexer/clearratelimits", async (
 // API: Release Search (Indexer Integration)
 app.MapPost("/api/release/search", async (
     ReleaseSearchRequest request,
-    Sportarr.Api.Services.IndexerSearchService indexerSearchService,
+    IIndexerSearchService indexerSearchService,
     SportarrDbContext db) =>
 {
     // Search all enabled indexers
@@ -7403,7 +7403,7 @@ app.MapPost("/api/release/search", async (
 // API: Test indexer connection
 app.MapPost("/api/indexer/test", async (
     HttpRequest request,
-    Sportarr.Api.Services.IndexerSearchService indexerSearchService,
+    IIndexerSearchService indexerSearchService,
     ILogger<Program> logger) =>
 {
     try
@@ -8954,9 +8954,9 @@ app.MapGet("/api/dvr/stats", async (SportarrDbContext db) =>
 
 // Get all recordings with optional filtering
 app.MapGet("/api/dvr/recordings", async (
-    Sportarr.Api.Services.DvrRecordingService dvrService,
-    Sportarr.Api.Services.DvrQualityScoreCalculator scoreCalculator,
-    Sportarr.Api.Services.ConfigService configService,
+    DvrRecordingService dvrService,
+    DvrQualityScoreCalculator scoreCalculator,
+    IConfigService configService,
     SportarrDbContext db,
     DvrRecordingStatus? status,
     int? eventId,
@@ -9018,7 +9018,7 @@ app.MapGet("/api/dvr/recordings", async (
 });
 
 // Get a single recording
-app.MapGet("/api/dvr/recordings/{id:int}", async (int id, Sportarr.Api.Services.DvrRecordingService dvrService) =>
+app.MapGet("/api/dvr/recordings/{id:int}", async (int id, DvrRecordingService dvrService) =>
 {
     var recording = await dvrService.GetRecordingByIdAsync(id);
     if (recording == null)
@@ -9027,7 +9027,7 @@ app.MapGet("/api/dvr/recordings/{id:int}", async (int id, Sportarr.Api.Services.
 });
 
 // Schedule a new recording
-app.MapPost("/api/dvr/recordings", async (ScheduleDvrRecordingRequest request, Sportarr.Api.Services.DvrRecordingService dvrService, ILogger<Program> logger) =>
+app.MapPost("/api/dvr/recordings", async (ScheduleDvrRecordingRequest request, DvrRecordingService dvrService, ILogger<Program> logger) =>
 {
     try
     {
@@ -9042,7 +9042,7 @@ app.MapPost("/api/dvr/recordings", async (ScheduleDvrRecordingRequest request, S
 });
 
 // Update a scheduled recording
-app.MapPut("/api/dvr/recordings/{id:int}", async (int id, ScheduleDvrRecordingRequest request, Sportarr.Api.Services.DvrRecordingService dvrService) =>
+app.MapPut("/api/dvr/recordings/{id:int}", async (int id, ScheduleDvrRecordingRequest request, DvrRecordingService dvrService) =>
 {
     try
     {
@@ -9311,7 +9311,7 @@ app.MapPost("/api/dvr/profiles/compare", async (HttpRequest request, Sportarr.Ap
 });
 
 // Get DVR settings from config
-app.MapGet("/api/dvr/settings", async (Sportarr.Api.Services.ConfigService configService) =>
+app.MapGet("/api/dvr/settings", async (IConfigService configService) =>
 {
     var config = await configService.GetConfigAsync();
     return Results.Ok(new
@@ -9340,7 +9340,7 @@ app.MapGet("/api/dvr/settings", async (Sportarr.Api.Services.ConfigService confi
 });
 
 // Update DVR settings
-app.MapPut("/api/dvr/settings", async (HttpRequest request, Sportarr.Api.Services.ConfigService configService) =>
+app.MapPut("/api/dvr/settings", async (HttpRequest request, IConfigService configService) =>
 {
     using var reader = new StreamReader(request.Body);
     var json = await reader.ReadToEndAsync();
@@ -9399,14 +9399,14 @@ app.MapPost("/api/event/{eventId:int}/search", async (
     int eventId,
     HttpRequest request,
     SportarrDbContext db,
-    Sportarr.Api.Services.IndexerSearchService indexerSearchService,
-    Sportarr.Api.Services.EventQueryService eventQueryService,
-    Sportarr.Api.Services.ConfigService configService,
-    Sportarr.Api.Services.ReleaseMatchingService releaseMatchingService,
-    Sportarr.Api.Services.ReleaseMatchScorer releaseMatchScorer,
-    Sportarr.Api.Services.SearchResultCache searchResultCache,
-    Sportarr.Api.Services.ReleaseEvaluator releaseEvaluator,
-    Sportarr.Api.Services.EventPartDetector partDetector,
+    IIndexerSearchService indexerSearchService,
+    EventQueryService eventQueryService,
+    IConfigService configService,
+    ReleaseMatchingService releaseMatchingService,
+    ReleaseMatchScorer releaseMatchScorer,
+    SearchResultCache searchResultCache,
+    ReleaseEvaluator releaseEvaluator,
+    EventPartDetector partDetector,
     ILogger<Program> logger) =>
 {
     // Load config for multi-part episode setting
@@ -9820,9 +9820,9 @@ app.MapPost("/api/event/{eventId:int}/search", async (
 app.MapPost("/api/event/{eventId:int}/search-pack", async (
     int eventId,
     SportarrDbContext db,
-    Sportarr.Api.Services.IndexerSearchService indexerSearchService,
-    Sportarr.Api.Services.EventQueryService eventQueryService,
-    Sportarr.Api.Services.ConfigService configService,
+    IIndexerSearchService indexerSearchService,
+    EventQueryService eventQueryService,
+    IConfigService configService,
     ILogger<Program> logger) =>
 {
     logger.LogInformation("[PACK SEARCH] POST /api/event/{EventId}/search-pack - Pack search initiated", eventId);
@@ -12169,8 +12169,8 @@ app.MapGet("/api/events/livescore", async (
 app.MapPost("/api/release/grab", async (
     HttpContext context,
     SportarrDbContext db,
-    Sportarr.Api.Services.DownloadClientService downloadClientService,
-    ConfigService configService,
+    IDownloadClientService downloadClientService,
+    IConfigService configService,
     ILogger<Program> logger) =>
 {
     // Parse the request body which contains both release and eventId
@@ -12492,8 +12492,8 @@ app.MapPost("/api/event/{eventId:int}/automatic-search", async (
     int eventId,
     HttpRequest request,
     int? qualityProfileId,
-    Sportarr.Api.Services.TaskService taskService,
-    Sportarr.Api.Services.ConfigService configService,
+    ITaskService taskService,
+    IConfigService configService,
     SportarrDbContext db,
     ILogger<Program> logger) =>
 {
@@ -12603,7 +12603,7 @@ app.MapPost("/api/event/{eventId:int}/automatic-search", async (
 });
 
 // API: Get search queue status
-app.MapGet("/api/search/queue", (Sportarr.Api.Services.SearchQueueService searchQueueService) =>
+app.MapGet("/api/search/queue", (SearchQueueService searchQueueService) =>
 {
     var status = searchQueueService.GetQueueStatus();
     return Results.Ok(status);
@@ -12612,14 +12612,14 @@ app.MapGet("/api/search/queue", (Sportarr.Api.Services.SearchQueueService search
 // API: Get active search status (Sonarr-style bottom-left indicator)
 app.MapGet("/api/search/active", () =>
 {
-    var status = Sportarr.Api.Services.IndexerSearchService.GetCurrentSearchStatus();
+    var status = IndexerSearchService.GetCurrentSearchStatus();
     return Results.Ok(status);
 });
 
 // API: Queue a search for an event (uses new parallel queue system)
 app.MapPost("/api/search/queue", async (
     HttpRequest request,
-    Sportarr.Api.Services.SearchQueueService searchQueueService,
+    SearchQueueService searchQueueService,
     ILogger<Program> logger) =>
 {
     using var reader = new StreamReader(request.Body);
@@ -12630,7 +12630,7 @@ app.MapPost("/api/search/queue", async (
         return Results.BadRequest(new { error = "Request body required" });
     }
 
-    var requestData = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
+    var requestData = JsonSerializer.Deserialize<JsonElement>(json);
 
     if (!requestData.TryGetProperty("eventId", out var eventIdProp) || !eventIdProp.TryGetInt32(out int eventId))
     {
@@ -12653,7 +12653,7 @@ app.MapPost("/api/search/queue", async (
 // API: Queue searches for all events in a league
 app.MapPost("/api/search/queue/league/{leagueId:int}", async (
     int leagueId,
-    Sportarr.Api.Services.SearchQueueService searchQueueService,
+    SearchQueueService searchQueueService,
     ILogger<Program> logger) =>
 {
     logger.LogInformation("[SEARCH QUEUE API] Queueing search for all events in league {LeagueId}", leagueId);
@@ -12670,7 +12670,7 @@ app.MapPost("/api/search/queue/league/{leagueId:int}", async (
 // API: Get status of a specific queued search
 app.MapGet("/api/search/queue/{queueId}", (
     string queueId,
-    Sportarr.Api.Services.SearchQueueService searchQueueService) =>
+    SearchQueueService searchQueueService) =>
 {
     var item = searchQueueService.GetSearchStatus(queueId);
     if (item == null)
@@ -12683,7 +12683,7 @@ app.MapGet("/api/search/queue/{queueId}", (
 // API: Cancel a pending search
 app.MapDelete("/api/search/queue/{queueId}", (
     string queueId,
-    Sportarr.Api.Services.SearchQueueService searchQueueService,
+    SearchQueueService searchQueueService,
     ILogger<Program> logger) =>
 {
     logger.LogInformation("[SEARCH QUEUE API] Cancelling search {QueueId}", queueId);
@@ -12698,7 +12698,7 @@ app.MapDelete("/api/search/queue/{queueId}", (
 
 // API: Clear all pending searches
 app.MapDelete("/api/search/queue", (
-    Sportarr.Api.Services.SearchQueueService searchQueueService,
+    SearchQueueService searchQueueService,
     ILogger<Program> logger) =>
 {
     logger.LogInformation("[SEARCH QUEUE API] Clearing all pending searches");
@@ -12709,7 +12709,7 @@ app.MapDelete("/api/search/queue", (
 
 // API: Search all monitored events
 app.MapPost("/api/automatic-search/all", async (
-    Sportarr.Api.Services.AutomaticSearchService automaticSearchService) =>
+    IAutomaticSearchService automaticSearchService) =>
 {
     var results = await automaticSearchService.SearchAllMonitoredEventsAsync();
     return Results.Ok(results);
@@ -12719,9 +12719,9 @@ app.MapPost("/api/automatic-search/all", async (
 app.MapPost("/api/league/{leagueId:int}/automatic-search", async (
     int leagueId,
     SportarrDbContext db,
-    Sportarr.Api.Services.AutomaticSearchService automaticSearchService,
-    Sportarr.Api.Services.TaskService taskService,
-    Sportarr.Api.Services.ConfigService configService,
+    IAutomaticSearchService automaticSearchService,
+    ITaskService taskService,
+    IConfigService configService,
     ILogger<Program> logger) =>
 {
     logger.LogInformation("[AUTOMATIC SEARCH] POST /api/league/{LeagueId}/automatic-search - Searching all monitored events in league", leagueId);
@@ -12807,8 +12807,8 @@ app.MapPost("/api/leagues/{leagueId:int}/seasons/{season}/automatic-search", asy
     int leagueId,
     string season,
     SportarrDbContext db,
-    Sportarr.Api.Services.SearchQueueService searchQueueService,
-    Sportarr.Api.Services.ConfigService configService,
+    SearchQueueService searchQueueService,
+    IConfigService configService,
     ILogger<Program> logger) =>
 {
     logger.LogInformation("[AUTOMATIC SEARCH] POST /api/leagues/{LeagueId}/seasons/{Season}/automatic-search - Searching all monitored events in season", leagueId, season);
@@ -12899,7 +12899,7 @@ app.MapPost("/api/leagues/{leagueId:int}/seasons/{season}/search", async (
     int leagueId,
     string season,
     int? qualityProfileId,
-    Sportarr.Api.Services.SeasonSearchService seasonSearchService,
+    SeasonSearchService seasonSearchService,
     ILogger<Program> logger) =>
 {
     logger.LogInformation("[SEASON SEARCH] POST /api/leagues/{LeagueId}/seasons/{Season}/search - Manual season search", leagueId, season);
@@ -13370,7 +13370,7 @@ app.MapGet("/api/v3/manualimport", (
 });
 
 // POST /api/v3/command - Execute commands (used by Decypharr for ManualImport)
-app.MapPost("/api/v3/command", async (HttpContext context, SportarrDbContext db, FileImportService fileImportService, ILogger<Program> logger) =>
+app.MapPost("/api/v3/command", async (HttpContext context, SportarrDbContext db, IFileImportService fileImportService, ILogger<Program> logger) =>
 {
     using var reader = new StreamReader(context.Request.Body);
     var json = await reader.ReadToEndAsync();

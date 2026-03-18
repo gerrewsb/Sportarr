@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sportarr.Api.Data;
 using Sportarr.Api.Models;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Services;
 
@@ -16,20 +17,20 @@ public class SeasonSearchService
 {
     private readonly ILogger<SeasonSearchService> _logger;
     private readonly SportarrDbContext _db;
-    private readonly IndexerSearchService _indexerSearchService;
+    private readonly IIndexerSearchService _indexerSearchService;
     private readonly ReleaseMatchingService _releaseMatchingService;
     private readonly ReleaseEvaluator _releaseEvaluator;
     private readonly EventPartDetector _eventPartDetector;
-    private readonly ConfigService _configService;
+    private readonly IConfigService _configService;
 
     public SeasonSearchService(
         ILogger<SeasonSearchService> logger,
         SportarrDbContext db,
-        IndexerSearchService indexerSearchService,
+        IIndexerSearchService indexerSearchService,
         ReleaseMatchingService releaseMatchingService,
         ReleaseEvaluator releaseEvaluator,
         EventPartDetector eventPartDetector,
-        ConfigService configService)
+        IConfigService configService)
     {
         _logger = logger;
         _db = db;

@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Sportarr.Api.Models;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Services;
 
@@ -14,7 +15,7 @@ public class SportarrApiClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<SportarrApiClient> _logger;
-    private readonly ConfigService _configService;
+    private readonly IConfigService _configService;
     private readonly string _defaultApiBaseUrl;
 
     // JSON deserialization options for Sportarr API responses (case-insensitive)
@@ -23,7 +24,10 @@ public class SportarrApiClient
         PropertyNameCaseInsensitive = true
     };
 
-    public SportarrApiClient(HttpClient httpClient, ILogger<SportarrApiClient> logger, IConfiguration configuration, ConfigService configService)
+    public SportarrApiClient(HttpClient httpClient, 
+        ILogger<SportarrApiClient> logger, 
+        IConfiguration configuration, 
+        IConfigService configService)
     {
         _httpClient = httpClient;
         _logger = logger;

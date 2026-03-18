@@ -2,6 +2,7 @@ using Sportarr.Api.Data;
 using Sportarr.Api.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Text.RegularExpressions;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Services;
 
@@ -51,7 +52,7 @@ public class RssSyncService : BackgroundService
             {
                 // Load config to get current interval
                 using var scope = _serviceProvider.CreateScope();
-                var configService = scope.ServiceProvider.GetRequiredService<ConfigService>();
+                var configService = scope.ServiceProvider.GetRequiredService<IConfigService>();
                 var config = await configService.GetConfigAsync();
 
                 // Validate and clamp interval to safe bounds (Sonarr: min 10, max 120 minutes)
@@ -92,10 +93,10 @@ public class RssSyncService : BackgroundService
     {
         using var scope = _serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SportarrDbContext>();
-        var indexerSearchService = scope.ServiceProvider.GetRequiredService<IndexerSearchService>();
-        var downloadClientService = scope.ServiceProvider.GetRequiredService<DownloadClientService>();
+        var indexerSearchService = scope.ServiceProvider.GetRequiredService<IIndexerSearchService>();
+        var downloadClientService = scope.ServiceProvider.GetRequiredService<IDownloadClientService>();
         var delayProfileService = scope.ServiceProvider.GetRequiredService<DelayProfileService>();
-        var configService = scope.ServiceProvider.GetRequiredService<ConfigService>();
+        var configService = scope.ServiceProvider.GetRequiredService<IConfigService>();
         var partDetector = scope.ServiceProvider.GetRequiredService<EventPartDetector>();
         var releaseMatchingService = scope.ServiceProvider.GetRequiredService<ReleaseMatchingService>();
         var releaseEvaluator = scope.ServiceProvider.GetRequiredService<ReleaseEvaluator>();
@@ -349,7 +350,7 @@ public class RssSyncService : BackgroundService
         Config config,
         EventPartDetector partDetector,
         DelayProfileService delayProfileService,
-        DownloadClientService downloadClientService,
+        IDownloadClientService downloadClientService,
         CancellationToken cancellationToken)
     {
         // 1. Detect part FIRST (for fighting sports) - needed for all subsequent checks
@@ -568,7 +569,7 @@ public class RssSyncService : BackgroundService
     private async Task RemoveAndCancelQueueItemAsync(
         SportarrDbContext db,
         DownloadQueueItem queueItem,
-        DownloadClientService downloadClientService,
+        IDownloadClientService downloadClientService,
         CancellationToken cancellationToken)
     {
         // Get download client to cancel the download
@@ -602,7 +603,7 @@ public class RssSyncService : BackgroundService
         SportarrDbContext db,
         Event evt,
         ReleaseSearchResult release,
-        DownloadClientService downloadClientService,
+        IDownloadClientService downloadClientService,
         string? releasePart,
         CancellationToken cancellationToken)
     {
@@ -774,7 +775,7 @@ public class RssSyncService : BackgroundService
         try
         {
             using var scope = _serviceProvider.CreateScope();
-            var autoSearchService = scope.ServiceProvider.GetRequiredService<AutomaticSearchService>();
+            var autoSearchService = scope.ServiceProvider.GetRequiredService<IAutomaticSearchService>();
 
             foreach (var partName in partsToSearch)
             {

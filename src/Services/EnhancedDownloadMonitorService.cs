@@ -1,6 +1,7 @@
 using Sportarr.Api.Data;
 using Sportarr.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Services;
 
@@ -66,9 +67,9 @@ public class EnhancedDownloadMonitorService : BackgroundService
     {
         using var scope = _serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SportarrDbContext>();
-        var downloadClientService = scope.ServiceProvider.GetRequiredService<DownloadClientService>();
-        var fileImportService = scope.ServiceProvider.GetRequiredService<FileImportService>();
-        var configService = scope.ServiceProvider.GetRequiredService<ConfigService>();
+        var downloadClientService = scope.ServiceProvider.GetRequiredService<IDownloadClientService>();
+        var fileImportService = scope.ServiceProvider.GetRequiredService<IFileImportService>();
+        var configService = scope.ServiceProvider.GetRequiredService<IConfigService>();
 
         // Get all active downloads (not completed, not imported, not failed permanently)
         var activeDownloads = await db.DownloadQueue
@@ -134,8 +135,8 @@ public class EnhancedDownloadMonitorService : BackgroundService
 
     private async Task ProcessDownloadAsync(
         DownloadQueueItem download,
-        DownloadClientService downloadClientService,
-        FileImportService fileImportService,
+        IDownloadClientService downloadClientService,
+        IFileImportService fileImportService,
         SportarrDbContext db,
         bool enableCompletedHandling,
         bool redownloadFailed,
@@ -397,8 +398,8 @@ public class EnhancedDownloadMonitorService : BackgroundService
 
     private async Task HandleCompletedDownload(
         DownloadQueueItem download,
-        DownloadClientService downloadClientService,
-        FileImportService fileImportService,
+        IDownloadClientService downloadClientService,
+        IFileImportService fileImportService,
         SportarrDbContext? db = null)
     {
         download.CompletedAt = DateTime.UtcNow;
@@ -521,7 +522,7 @@ public class EnhancedDownloadMonitorService : BackgroundService
 
     private async Task HandleFailedDownload(
         DownloadQueueItem download,
-        DownloadClientService downloadClientService,
+        IDownloadClientService downloadClientService,
         SportarrDbContext db,
         bool redownloadFailed,
         bool redownloadFailedFromInteractive)
@@ -612,7 +613,7 @@ public class EnhancedDownloadMonitorService : BackgroundService
     {
         using var scope = _serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SportarrDbContext>();
-        var downloadClientService = scope.ServiceProvider.GetRequiredService<DownloadClientService>();
+        var downloadClientService = scope.ServiceProvider.GetRequiredService<IDownloadClientService>();
 
         // Get all enabled download clients
         var clients = await db.DownloadClients

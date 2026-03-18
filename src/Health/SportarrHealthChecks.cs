@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Sportarr.Api.Data;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Health;
 
@@ -135,7 +136,7 @@ public class ConfigurationHealthCheck : IHealthCheck
         try
         {
             using var scope = _scopeFactory.CreateScope();
-            var configService = scope.ServiceProvider.GetRequiredService<Sportarr.Api.Services.ConfigService>();
+            var configService = scope.ServiceProvider.GetRequiredService<IConfigService>();
             var dbContext = scope.ServiceProvider.GetRequiredService<SportarrDbContext>();
 
             var config = await configService.GetConfigAsync().ConfigureAwait(false);

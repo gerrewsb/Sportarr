@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using Sportarr.Api.Data;
 using Sportarr.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Services;
 
@@ -17,7 +18,7 @@ public class LibraryImportService
     private readonly SportsFileNameParser _sportsParser;
     private readonly FileNamingService _namingService;
     private readonly EventPartDetector _partDetector;
-    private readonly ConfigService _configService;
+    private readonly IConfigService _configService;
     private readonly SportarrApiClient _sportarrApiClient;
 
     private static readonly string[] VideoExtensions = SupportedExtensions.Video;
@@ -29,7 +30,7 @@ public class LibraryImportService
         SportsFileNameParser sportsParser,
         FileNamingService namingService,
         EventPartDetector partDetector,
-        ConfigService configService,
+        IConfigService configService,
         SportarrApiClient sportarrApiClient)
     {
         _db = db;

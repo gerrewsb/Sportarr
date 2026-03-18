@@ -3,6 +3,7 @@ using System.Text.Json;
 using Sportarr.Api.Data;
 using Sportarr.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Services;
 
@@ -428,7 +429,7 @@ public class SearchQueueService
         {
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<SportarrDbContext>();
-            var automaticSearchService = scope.ServiceProvider.GetRequiredService<AutomaticSearchService>();
+            var automaticSearchService = scope.ServiceProvider.GetRequiredService<IAutomaticSearchService>();
 
             // Update task to Running status
             if (queueItem.TaskId.HasValue)

@@ -1,6 +1,7 @@
 using Sportarr.Api.Data;
 using Sportarr.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Services;
 
@@ -11,15 +12,15 @@ public class HealthCheckService
 {
     private readonly SportarrDbContext _db;
     private readonly ILogger<HealthCheckService> _logger;
-    private readonly DownloadClientService _downloadClientService;
-    private readonly ConfigService _configService;
+    private readonly IDownloadClientService _downloadClientService;
+    private readonly IConfigService _configService;
     private readonly DiskSpaceService _diskSpaceService;
 
     public HealthCheckService(
         SportarrDbContext db,
         ILogger<HealthCheckService> logger,
-        DownloadClientService downloadClientService,
-        ConfigService configService,
+        IDownloadClientService downloadClientService,
+        IConfigService configService,
         DiskSpaceService diskSpaceService)
     {
         _db = db;

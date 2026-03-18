@@ -2,6 +2,7 @@ using Sportarr.Api.Data;
 using Sportarr.Api.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Text.RegularExpressions;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Services;
 
@@ -17,14 +18,14 @@ namespace Sportarr.Api.Services;
 public class ImportService
 {
     private readonly SportarrDbContext _db;
-    private readonly ConfigService _configService;
+    private readonly IConfigService _configService;
     private readonly ILogger<ImportService> _logger;
 
     private static readonly string[] VideoExtensions = SupportedExtensions.Video;
 
     public ImportService(
         SportarrDbContext db,
-        ConfigService configService,
+        IConfigService configService,
         ILogger<ImportService> logger)
     {
         _db = db;

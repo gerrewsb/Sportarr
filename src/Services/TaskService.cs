@@ -615,7 +615,7 @@ public class TaskService : ITaskService
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SportarrDbContext>();
-        var automaticSearchService = scope.ServiceProvider.GetRequiredService<AutomaticSearchService>();
+        var automaticSearchService = scope.ServiceProvider.GetRequiredService<IAutomaticSearchService>();
 
         try
         {

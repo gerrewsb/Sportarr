@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Sportarr.Api.Data;
 using Sportarr.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Services;
 
@@ -15,7 +16,7 @@ public class PackImportService
     private readonly SportarrDbContext _db;
     private readonly MediaFileParser _parser;
     private readonly FileNamingService _namingService;
-    private readonly ConfigService _configService;
+    private readonly IConfigService _configService;
     private readonly DiskSpaceService _diskSpaceService;
     private readonly ReleaseEvaluator _releaseEvaluator;
     private readonly SportarrApiClient _sportarrApiClient;
@@ -27,7 +28,7 @@ public class PackImportService
         SportarrDbContext db,
         MediaFileParser parser,
         FileNamingService namingService,
-        ConfigService configService,
+        IConfigService configService,
         DiskSpaceService diskSpaceService,
         ReleaseEvaluator releaseEvaluator,
         SportarrApiClient sportarrApiClient,

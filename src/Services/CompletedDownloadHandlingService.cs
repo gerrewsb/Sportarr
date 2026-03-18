@@ -1,6 +1,7 @@
 using Sportarr.Api.Data;
 using Sportarr.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Services;
 
@@ -52,8 +53,8 @@ public class CompletedDownloadHandlingService : BackgroundService
     {
         using var scope = _serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SportarrDbContext>();
-        var downloadClientService = scope.ServiceProvider.GetRequiredService<DownloadClientService>();
-        var fileImportService = scope.ServiceProvider.GetRequiredService<FileImportService>();
+        var downloadClientService = scope.ServiceProvider.GetRequiredService<IDownloadClientService>();
+        var fileImportService = scope.ServiceProvider.GetRequiredService<IFileImportService>();
 
         _logger.LogDebug("[Completed Download Handler] Checking for completed downloads");
 
@@ -87,8 +88,8 @@ public class CompletedDownloadHandlingService : BackgroundService
 
     private async Task ProcessDownloadAsync(
         SportarrDbContext db,
-        DownloadClientService downloadClientService,
-        FileImportService fileImportService,
+        IDownloadClientService downloadClientService,
+        IFileImportService fileImportService,
         DownloadQueueItem download)
     {
         // Get the download client for this download

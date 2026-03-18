@@ -14,12 +14,12 @@ public class FileImportService : IFileImportService
     private readonly SportarrDbContext _db;
     private readonly MediaFileParser _parser;
     private readonly FileNamingService _namingService;
-    private readonly DownloadClientService _downloadClientService;
+    private readonly IDownloadClientService _downloadClientService;
     private readonly EventPartDetector _partDetector;
-    private readonly ConfigService _configService;
+    private readonly IConfigService _configService;
     private readonly DiskSpaceService _diskSpaceService;
     private readonly SportarrApiClient _sportarrApiClient;
-    private readonly NotificationService _notificationService;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<FileImportService> _logger;
 
     private static readonly string[] VideoExtensions = SupportedExtensions.Video;
@@ -28,12 +28,12 @@ public class FileImportService : IFileImportService
         SportarrDbContext db,
         MediaFileParser parser,
         FileNamingService namingService,
-        DownloadClientService downloadClientService,
+        IDownloadClientService downloadClientService,
         EventPartDetector partDetector,
-        ConfigService configService,
+        IConfigService configService,
         DiskSpaceService diskSpaceService,
         SportarrApiClient sportarrApiClient,
-        NotificationService notificationService,
+        INotificationService notificationService,
         ILogger<FileImportService> logger)
     {
         _db = db;

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Sportarr.Api.Models;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Services;
 
@@ -10,13 +11,13 @@ namespace Sportarr.Api.Services;
 public class FFmpegRecorderService
 {
     private readonly ILogger<FFmpegRecorderService> _logger;
-    private readonly ConfigService _configService;
+    private readonly IConfigService _configService;
     private readonly Dictionary<int, RecordingProcess> _activeRecordings = new();
     private readonly object _lock = new();
 
     public FFmpegRecorderService(
         ILogger<FFmpegRecorderService> logger,
-        ConfigService configService)
+        IConfigService configService)
     {
         _logger = logger;
         _configService = configService;

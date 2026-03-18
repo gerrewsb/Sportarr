@@ -13,13 +13,12 @@ namespace Sportarr.Api.Services;
 public class AutomaticSearchService : IAutomaticSearchService
 {
     private readonly SportarrDbContext _db;
-    private readonly IndexerSearchService _indexerSearchService;
-    private readonly DownloadClientService _downloadClientService;
+    private readonly IIndexerSearchService _indexerSearchService;
+    private readonly IDownloadClientService _downloadClientService;
     private readonly EventQueryService _eventQueryService;
     private readonly DelayProfileService _delayProfileService;
     private readonly ReleaseMatchingService _releaseMatchingService;
-    private readonly ConfigService _configService;
-    private readonly ReleaseCacheService _releaseCacheService;
+    private readonly IConfigService _configService;
     private readonly ReleaseMatchScorer _releaseMatchScorer;
     private readonly SearchResultCache _searchResultCache;
     private readonly ReleaseEvaluator _releaseEvaluator;
@@ -35,13 +34,12 @@ public class AutomaticSearchService : IAutomaticSearchService
 
     public AutomaticSearchService(
         SportarrDbContext db,
-        IndexerSearchService indexerSearchService,
-        DownloadClientService downloadClientService,
+        IIndexerSearchService indexerSearchService,
+        IDownloadClientService downloadClientService,
         EventQueryService eventQueryService,
         DelayProfileService delayProfileService,
         ReleaseMatchingService releaseMatchingService,
-        ConfigService configService,
-        ReleaseCacheService releaseCacheService,
+        IConfigService configService,
         ReleaseMatchScorer releaseMatchScorer,
         SearchResultCache searchResultCache,
         ReleaseEvaluator releaseEvaluator,
@@ -55,7 +53,6 @@ public class AutomaticSearchService : IAutomaticSearchService
         _delayProfileService = delayProfileService;
         _releaseMatchingService = releaseMatchingService;
         _configService = configService;
-        _releaseCacheService = releaseCacheService;
         _releaseMatchScorer = releaseMatchScorer;
         _searchResultCache = searchResultCache;
         _releaseEvaluator = releaseEvaluator;

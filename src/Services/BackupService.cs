@@ -2,6 +2,7 @@ using Sportarr.Api.Data;
 using Sportarr.Api.Models;
 using Microsoft.EntityFrameworkCore;
 using System.IO.Compression;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Services;
 
@@ -14,9 +15,12 @@ public class BackupService
     private readonly ILogger<BackupService> _logger;
     private readonly string _dataDirectory;
     private readonly string _databasePath;
-    private readonly ConfigService _configService;
+    private readonly IConfigService _configService;
 
-    public BackupService(SportarrDbContext db, ILogger<BackupService> logger, IConfiguration configuration, ConfigService configService)
+    public BackupService(SportarrDbContext db, 
+        ILogger<BackupService> logger, 
+        IConfiguration configuration, 
+        IConfigService configService)
     {
         _db = db;
         _logger = logger;

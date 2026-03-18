@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Authentication;
 
@@ -19,10 +20,10 @@ public class ApiKeyAuthenticationOptions : AuthenticationSchemeOptions
 
 public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthenticationOptions>
 {
-    private readonly Sportarr.Api.Services.ConfigService _configService;
+    private readonly IConfigService _configService;
 
     public ApiKeyAuthenticationHandler(
-        Sportarr.Api.Services.ConfigService configService,
+        IConfigService configService,
         IOptionsMonitor<ApiKeyAuthenticationOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder)

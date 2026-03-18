@@ -26,7 +26,7 @@ public class IndexerSearchService : IIndexerSearchService
     private readonly ReleaseProfileService _releaseProfileService;
     private readonly QualityDetectionService _qualityDetection;
     private readonly IndexerStatusService _indexerStatus;
-    private readonly ConfigService _configService;
+    private readonly IConfigService _configService;
 
     // Max concurrent indexer queries per search (prevents overwhelming many indexers at once)
     private const int MaxConcurrentIndexerQueries = 5;
@@ -63,7 +63,7 @@ public class IndexerSearchService : IIndexerSearchService
         ReleaseProfileService releaseProfileService,
         QualityDetectionService qualityDetection,
         IndexerStatusService indexerStatus,
-        ConfigService configService)
+        IConfigService configService)
     {
         _db = db;
         _loggerFactory = loggerFactory;

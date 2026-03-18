@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Cryptography.KeyDerivation;
 using System.Text.Json;
 using Sportarr.Api.Data;
 using Sportarr.Api.Models;
+using Sportarr.Api.Services.Interfaces;
 
 namespace Sportarr.Api.Services;
 
@@ -18,10 +19,10 @@ public class SimpleAuthService
     private const int DEFAULT_ITERATIONS = 10000;
 
     private readonly SportarrDbContext _db;
-    private readonly ConfigService _configService;
+    private readonly IConfigService _configService;
     private readonly ILogger<SimpleAuthService> _logger;
 
-    public SimpleAuthService(SportarrDbContext db, ConfigService configService, ILogger<SimpleAuthService> logger)
+    public SimpleAuthService(SportarrDbContext db, IConfigService configService, ILogger<SimpleAuthService> logger)
     {
         _db = db;
         _configService = configService;
