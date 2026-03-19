@@ -73,7 +73,10 @@
     <None Include="..\agents\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="agents" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Endpoints\" />
+    <Compile Remove="Windows\**" />
+    <Content Remove="Windows\**" />
+    <EmbeddedResource Remove="Windows\**" />
+    <None Remove="Windows\**" />
   </ItemGroup>
 
 </Project>

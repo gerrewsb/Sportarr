@@ -33,4 +33,73 @@ public static class WebApplicationExtensions
 
         return app;
     }
+
+    public static WebApplication ConfigureStaticFilesMiddleWare(this WebApplication app)
+    {
+        // Configure static files (UI from wwwroot)
+        // For URL base support, we need to inject the urlBase into index.html
+        // and rewrite asset paths to include the base
+        app.Use(async (context, next) =>
+        {
+            // Serve index.html with urlBase injection for SPA routes
+            var path = context.Request.Path.Value ?? "";
+
+            // Check if this is a request that should serve index.html (SPA fallback)
+            // Skip API routes, static assets, and other special endpoints
+            var isApiOrAsset = path.StartsWith("/api", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWith("/assets", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWith("/initialize.json", StringComparison.OrdinalIgnoreCase) 
+                || path.StartsWith("/ping", StringComparison.OrdinalIgnoreCase) 
+                || path.StartsWith("/health", StringComparison.OrdinalIgnoreCase) 
+                || path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase) 
+                || path.Contains(".");  // Has file extension (e.g., .js, .css, .svg)
+
+            if (!isApiOrAsset)
+            {
+                // Serve index.html with urlBase injected
+                var webRootPath = app.Environment.WebRootPath;
+                var indexPath = Path.Combine(webRootPath, "index.html");
+
+                if (File.Exists(indexPath))
+                {
+                    var html = await File.ReadAllTextAsync(indexPath);
+
+                    // Get the configured URL base
+                    var configService = context.RequestServices.GetRequiredService<IConfigService>();
+                    var config = await configService.GetConfigAsync();
+                    var urlBase = config.UrlBase?.Trim() ?? string.Empty;
+
+                    if (!string.IsNullOrEmpty(urlBase))
+                    {
+                        if (!urlBase.StartsWith('/'))
+                            urlBase = '/' + urlBase;
+
+                        urlBase = urlBase.TrimEnd('/');
+
+                        // Inject urlBase script before the first script tag
+                        // This sets window.Sportarr.urlBase BEFORE main.tsx runs
+                        var urlBaseScript = $@"<script>window.Sportarr = window.Sportarr || {{}}; window.Sportarr.urlBase = '{urlBase}';</script>";
+                        html = html.Replace("<script", urlBaseScript + "<script");
+
+                        // Rewrite asset paths to include urlBase
+                        // /assets/ -> /sportarr/assets/
+                        // /logo.svg -> /sportarr/logo.svg
+                        html = html.Replace("href=\"/", $"href=\"{urlBase}/");
+                        html = html.Replace("src=\"/", $"src=\"{urlBase}/");
+                    }
+
+                    context.Response.ContentType = "text/html";
+                    await context.Response.WriteAsync(html);
+                    return;
+                }
+            }
+
+            await next();
+        });
+
+        app.UseDefaultFiles();
+        app.UseStaticFiles();
+
+        return app;
+    }
 }
